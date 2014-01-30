@@ -21,38 +21,42 @@ func (es *echoSource) Get(w http.ResponseWriter, id string, isThumb bool) {
 	fmt.Fprintf(w, "Echo\nid = %s\nisthumb = %v\n", id, isThumb)
 }
 
-type FedoraSource struct {
-	Url            string
-	User, Password string
-	Ns             string
+type fedoraSource struct {
+	cachedPrefix string
 }
 
-func (fs *FedoraSource) Get(w http.ResponseWriter, id string, isThumb bool) {
+func NewFedoraSource(url, namespace string) *fedoraSource {
+	return &fedoraSource{
+		cachedPrefix: url + "objects/" + namespace,
+	}
+}
+
+func (fs *fedoraSource) Get(w http.ResponseWriter, id string, isThumb bool) {
 	var path string
 
 	if isThumb {
-		path = fs.Url + "objects/" + fs.Ns + id + "/datastreams/thumbnail/content"
+		path = fs.cachedPrefix + id + "/datastreams/thumbnail/content"
 	} else {
-		path = fs.Url + "objects/" + fs.Ns + id + "/datastreams/content/content"
+		path = fs.cachedPrefix + id + "/datastreams/content/content"
 	}
 
 	log.Printf("asking Fedora %s", path)
 	r, err := http.Get(path)
-
 	if err != nil {
 		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "500 Internal Error", http.StatusInternalServerError)
 		return
 	}
 	defer r.Body.Close()
 
 	if r.StatusCode != 200 {
-		log.Printf("Got status code %d from fedora\n", r.StatusCode)
-		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("Got status %d from fedora\n", r.StatusCode)
+		http.Error(w, "500 Internal Error", http.StatusInternalServerError)
 		return
 	}
 
-	//w.Header().Set("Content-Type",
+	w.Header().Set("Content-Type", r.Header.Get("Content-Type"))
+	w.Header().Set("Content-Length", r.Header.Get("Content-Length"))
 
 	io.Copy(w, r.Body)
 

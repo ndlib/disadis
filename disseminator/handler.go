@@ -12,14 +12,10 @@ import (
 // standard log library.
 // This function only returns if there was an error, which is returned.
 func Run(port string) error {
-	fedora := &FedoraSource{
-		Url: "http://fedoraAdmin:fedoraAdmin@localhost:8983/fedora/",
-		Ns:  "vecnet:",
-	}
-	dh := NewDownloadHandler(isVecnetId,
-		NewPermitEverything(),
-		//NewEchoSource())
-		fedora)
+	fedora := "http://fedoraAdmin:fedoraAdmin@localhost:8983/fedora/"
+	dh := NewDownloadHandler(nil,
+		NewPermitHydra(fedora, "vecnet:"),
+		NewFedoraSource(fedora, "vecnet:"))
 	http.Handle("/download/", dh)
 	return http.ListenAndServe(":"+port, nil)
 }
@@ -29,7 +25,7 @@ func Run(port string) error {
 //	GET	/download/:id
 //	GET	/download/:id/thumbnail
 //
-// The id is first checked against a regexp to see if it is even remotely valid.
+// The id is first checked against a pattern to see if it is even remotely valid.
 // If so, the user is decoded from the request, and we check the access rights
 // to the object.
 //
@@ -120,12 +116,9 @@ func scanId(id, template string) bool {
 	}
 
 	for i := range id {
-		var allowed string
-		switch template[i] {
-		case 'e':
+		var allowed string = "0123456789"
+		if template[i] == 'e' {
 			allowed = noidx
-		default:
-			allowed = "0123456789"
 		}
 		if strings.IndexByte(allowed, id[i]) < 0 {
 			return false
