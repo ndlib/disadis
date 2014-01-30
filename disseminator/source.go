@@ -51,7 +51,11 @@ func (fs *fedoraSource) Get(w http.ResponseWriter, id string, isThumb bool) {
 
 	if r.StatusCode != 200 {
 		log.Printf("Got status %d from fedora\n", r.StatusCode)
-		http.Error(w, "500 Internal Error", http.StatusInternalServerError)
+		if r.StatusCode == 404 {
+			http.Error(w, "404 Not Found", http.StatusNotFound)
+		} else {
+			http.Error(w, "500 Internal Error", http.StatusInternalServerError)
+		}
 		return
 	}
 
