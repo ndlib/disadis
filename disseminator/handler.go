@@ -14,7 +14,7 @@ import (
 func Run(port string) error {
 	fedora := "http://fedoraAdmin:fedoraAdmin@localhost:8983/fedora/"
 	dh := NewDownloadHandler(nil,
-		NewPermitHydra(fedora, "vecnet:"),
+		NewHydraAuth(fedora, "vecnet:"),
 		NewFedoraSource(fedora, "vecnet:"))
 	http.Handle("/download/", dh)
 	return http.ListenAndServe(":"+port, nil)

@@ -5,6 +5,10 @@ import (
 	"testing"
 )
 
+func (u User) User() User {
+	return u
+}
+
 func TestCanView(t *testing.T) {
 	var hr = hydraRights{
 		version: "0.1",
@@ -21,8 +25,11 @@ func TestCanView(t *testing.T) {
 		{"xerxes", []string{"kite"}, false, true, false}, //keep people and groups separate
 		{"",nil, false, false, false}, //public cannot read yet
 	}
+	var u User
 	for _, z := range table {
-		a := hr.canView(z.user, z.groups)
+		u.Id = z.user
+		u.Groups = z.groups
+		a := hr.canView(u)
 		if a != z.allowed {
 			t.Errorf("got %v with %v\n", a, z)
 		}
@@ -30,7 +37,9 @@ func TestCanView(t *testing.T) {
 
 	hr.readGroups = append(hr.readGroups, "registered")
 	for _, z := range table {
-		a := hr.canView(z.user, z.groups)
+		u.Id = z.user
+		u.Groups = z.groups
+		a := hr.canView(u)
 		if a != z.registered {
 			t.Errorf("got %v with %v\n", a, z)
 		}
@@ -38,7 +47,9 @@ func TestCanView(t *testing.T) {
 
 	hr.readGroups = append(hr.readGroups, "public")
 	for _, z := range table {
-		a := hr.canView(z.user, z.groups)
+		u.Id = z.user
+		u.Groups = z.groups
+		a := hr.canView(u)
 		if ! a {
 			t.Errorf("got %v with %v\n", a, z)
 		}
@@ -46,7 +57,9 @@ func TestCanView(t *testing.T) {
 
 	hr.embargo = time.Now().Add(time.Hour)
 	for _, z := range table {
-		a := hr.canView(z.user, z.groups)
+		u.Id = z.user
+		u.Groups = z.groups
+		a := hr.canView(u)
 		if a != z.embargo {
 			t.Errorf("got %v with %v\n", a, z)
 		}
@@ -54,7 +67,9 @@ func TestCanView(t *testing.T) {
 
 	hr.version = "0.2"
 	for _, z := range table {
-		a := hr.canView(z.user, z.groups)
+		u.Id = z.user
+		u.Groups = z.groups
+		a := hr.canView(u)
 		if a {
 			t.Errorf("got %v with %v\n", a, z)
 		}
