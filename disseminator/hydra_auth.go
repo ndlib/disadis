@@ -14,28 +14,21 @@ func NewHydraAuth(fedoraPath, namespace string) *HydraAuth {
 }
 
 type HydraAuth struct {
-	CurrentUser RequestUser	// determines the current user
-	fedoraPrefix string	// location of fedora along with username and password
+	CurrentUser  RequestUser // determines the current user
+	fedoraPrefix string      // location of fedora along with username and password
 }
 
-
-// userer returns the current user for a request
-// You probably want to use the RequestUser interface
-type userer interface {
-	User() User
-}
-
-// A Userer returns the current user for a request
-// It handles verifying cookies and doing any database lookups, if needed
+// A RequestUser returns the current user for a request
+// It handles verifying cookies and doing any database lookups, if needed.
+// It should support concurrent access.
 type RequestUser interface {
 	User(r *http.Request) User
 }
 
-
 // A User is an identifier and a list of groups which the user belongs to.
 // The zero User represents an anonymous user.
 type User struct {
-	Id string
+	Id     string
 	Groups []string
 }
 
@@ -53,21 +46,14 @@ func (ha *HydraAuth) Check(r *http.Request, id string, isThumb bool) bool {
 	if rights == nil {
 		return false
 	}
-	var lu = lazyUser{f: ha.CurrentUser, r: r}
-	return rights.canView(&lu)
-}
-
-type lazyUser struct {
-	f CurrentUser
-	r *http.Request
-}
-
-func (lu *lazyUser) User() User {
-	if lu.f == nil {
-		// if a UserFinder was never supplied, return the anon user
-		return User{}
+	if rights.isPublic() {
+		return true
 	}
-	return lu.f.User(lu.r)
+	var u User // default is the anon user
+	if ha.CurrentUser != nil {
+		u = ha.CurrentUser.User(r)
+	}
+	return rights.canView(u)
 }
 
 // hydraRights contains the rights associated to a given hydra object.
@@ -81,20 +67,30 @@ type hydraRights struct {
 	version    string
 }
 
-// Compare an items access rights against a User to see if view access should be
-// granted. It will return either `true' if the user is allowed to see the item
-// or 'false' if the user cannot see the item
-//
-// A lazyUser is used instead of a User since canView() will only do a user lookup
-// if the item is not viewable by the public. A side-effect of this is that we
-// do not track who is downloading public content.
-func (hr *hydraRights) canView(u userer) bool {
+// Does this hydraRights allow public viewing?
+// Duplicates some of the canView logic to try to prevent decoding the user
+// when the decoding isn't needed.
+func (hr *hydraRights) isPublic() bool {
 	if hr.version != "0.1" {
 		return false
 	}
 	if time.Now().Before(hr.embargo) {
-		user := u.User()
+		return false
+	}
+	if member("public", hr.readGroups) || member("public", hr.editGroups) {
+		return true
+	}
+	return false
+}
 
+// Compare an items access rights against a User to see if view access should be
+// granted. It will return either `true' if the user is allowed to see the item
+// or 'false' if the user cannot see the item
+func (hr *hydraRights) canView(user User) bool {
+	if hr.version != "0.1" {
+		return false
+	}
+	if time.Now().Before(hr.embargo) {
 		// only edit people can view
 		if member(user.Id, hr.editPeople) ||
 			incommon(user.Groups, hr.editGroups) {
@@ -107,8 +103,6 @@ func (hr *hydraRights) canView(u userer) bool {
 	if member("public", hr.readGroups) || member("public", hr.editGroups) {
 		return true
 	}
-
-	user := u.User()
 
 	// registered?
 	if user.Id != "" && (member("registered", hr.readGroups) || member("registered", hr.editGroups)) {
