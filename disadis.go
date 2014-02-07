@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	_ "net/http/pprof"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -54,12 +55,23 @@ func signalHandler(sig <-chan os.Signal, logw Reopener) {
 }
 
 func main() {
-	var port string
-	var logfilename string
-	var logw Reopener
+	var (
+		port        string
+		logfilename string
+		logw        Reopener
+		pubtktKey   string
+		fedoraAddr  string
+		prefix      string
+	)
 
 	flag.StringVarP(&port, "port", "p", "8080", "port to run on")
 	flag.StringVarP(&logfilename, "log", "l", "", "name of log file")
+	flag.StringVarP(&pubtktKey, "pubtkt-key", "", "",
+		"filename of PEM encoded public key to use for pubtkt authentication")
+	flag.StringVarP(&fedoraAddr, "fedora", "", "",
+		"url to use for fedora, includes username and password, if needed")
+	flag.StringVarP(&prefix, "prefix", "", "",
+		"prefix for all fedora id strings. Includes the colon, if there is one")
 
 	flag.Parse()
 
@@ -72,7 +84,19 @@ func main() {
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGUSR1, syscall.SIGUSR2)
 	go signalHandler(sig, logw)
 
-	err := disseminator.Run(port)
+	if fedoraAddr == "" {
+		log.Printf("Error: Fedora address must be set. (--fedora <server addr>)")
+		os.Exit(1)
+	}
+	ha := disseminator.NewHydraAuth(fedoraAddr, prefix)
+	if pubtktKey != "" {
+		ha.CurrentUser = disseminator.NewPubtktAuthFromKeyFile(pubtktKey)
+	}
+	http.Handle("/d/",
+		disseminator.NewDownloadHandler(nil,
+			ha,
+			disseminator.NewFedoraSource(fedoraAddr, prefix)))
+	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
