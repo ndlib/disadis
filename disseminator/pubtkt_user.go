@@ -18,6 +18,8 @@ import (
 	"time"
 )
 
+// TODO: add better logging to help track down ticket errors?
+
 func NewPubtktAuth(publicKey interface{}) *PubtktAuth {
 	return &PubtktAuth{publicKey: publicKey}
 }
@@ -28,6 +30,7 @@ func NewPubtktAuthFromKeyFile(filename string) *PubtktAuth {
 		panic(err)
 	}
 	buf, err := ioutil.ReadAll(f)
+	f.Close()
 	if err != nil {
 		panic(err)
 	}
@@ -73,7 +76,7 @@ func (pa *PubtktAuth) User(r *http.Request) User {
 }
 
 // verify the message text against signature using the public key
-// in PubtktAuth. The signature is base64 encoded.
+// in PubtktAuth. Expects the signature to be base64 encoded.
 // Returns true if the signature is valid, false otherwise
 func (pa *PubtktAuth) verifySig(text, signature string) bool {
 	sig, err := base64.StdEncoding.DecodeString(signature)
@@ -117,7 +120,7 @@ type Pubtkt struct {
 	UData       string
 }
 
-// verifies the pairing of the request and the ticket
+// Verify the pairing of the request and the ticket.
 // returns true if the pair are valid, false otherwise
 func verifyTicket(r *http.Request, t *Pubtkt) bool {
 	if t.ClientIP != "" {
