@@ -61,6 +61,9 @@ func (fs *fedoraSource) Get(w http.ResponseWriter, id string, isThumb bool) {
 
 	w.Header().Set("Content-Type", r.Header.Get("Content-Type"))
 	w.Header().Set("Content-Length", r.Header.Get("Content-Length"))
+	w.Header().Set("Content-Disposition", r.Header.Get("Content-Disposition"))
+	w.Header().Set("Content-Transfer-Encoding", "binary")
+	w.Header().Set("Cache-Control", "private")
 
 	io.Copy(w, r.Body)
 

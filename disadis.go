@@ -2,8 +2,8 @@ package main
 
 import (
 	"log"
-	_ "net/http/pprof"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -96,6 +96,9 @@ func main() {
 		disseminator.NewDownloadHandler(nil,
 			ha,
 			disseminator.NewFedoraSource(fedoraAddr, prefix)))
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		log.Println(r.URL)
+	})
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)

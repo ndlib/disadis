@@ -10,8 +10,10 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"io/ioutil"
+	"log"
 	"math/big"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -58,11 +60,17 @@ func (pa *PubtktAuth) User(r *http.Request) User {
 	if err != nil {
 		return User{}
 	}
-	pubtkt := cookie.Value
+	pubtkt, err := url.QueryUnescape(cookie.Value)
+	if err != nil {
+		log.Printf("Error unescaping cookie %s", err)
+	}
+
+	log.Printf("Found pubtkt %s", pubtkt)
 
 	// verify the ticket
 	i := strings.LastIndex(pubtkt, ";sig=")
 	if i == -1 || !pa.verifySig(pubtkt[:i], pubtkt[i+5:]) {
+		log.Printf("ticket sig failed")
 		return User{}
 	}
 
@@ -81,6 +89,7 @@ func (pa *PubtktAuth) User(r *http.Request) User {
 func (pa *PubtktAuth) verifySig(text, signature string) bool {
 	sig, err := base64.StdEncoding.DecodeString(signature)
 	if err != nil {
+		log.Println("problem decoding sig", err)
 		return false
 	}
 	h := sha1.New()
@@ -94,10 +103,11 @@ func (pa *PubtktAuth) verifySig(text, signature string) bool {
 	case *dsa.PublicKey:
 		dsaSig := new(dsaSignature)
 		if _, err := asn1.Unmarshal(sig, dsaSig); err != nil {
+			log.Println("problem decoding dsa", err)
 			return false
 		}
 		if dsaSig.R.Sign() <= 0 || dsaSig.S.Sign() <= 0 {
-			// "x509: DSA signature contained zero or negative values")
+			log.Println("509: DSA signature contained zero or negative values")
 			return false
 		}
 		return dsa.Verify(pub, digest, dsaSig.R, dsaSig.S)
@@ -130,10 +140,12 @@ func verifyTicket(r *http.Request, t *Pubtkt) bool {
 			ip = ip[:i]
 		}
 		if t.ClientIP != ip {
+			log.Println("client ip does not match ticket ip")
 			return false
 		}
 	}
 	if time.Now().After(t.ValidUntil) {
+		log.Println("ticket has expired")
 		return false
 	}
 	return true
@@ -179,5 +191,6 @@ func parseTicket(text string) *Pubtkt {
 			result.UData = kv[1]
 		}
 	}
+	log.Printf("Decoded ticket %v", result)
 	return result
 }

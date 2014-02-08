@@ -65,7 +65,7 @@ func (dh *downloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// "" / "downloads" / "id" ( / thumbnail )?
 
-	path = strings.TrimPrefix(r.URL.Path, "/download/")
+	path = strings.TrimPrefix(r.URL.Path, "/d/")
 	path = strings.TrimSuffix(path, "/")
 	components = strings.SplitN(path, "/", 2)
 
@@ -84,7 +84,7 @@ func (dh *downloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !dh.auth.Check(r, components[0], isThumb) {
-		w.WriteHeader(http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -93,8 +93,7 @@ func (dh *downloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	return
 
 notfound:
-	w.WriteHeader(http.StatusNotFound)
-	w.Write([]byte("404 Not Found"))
+	http.Error(w, "404 Not Found", http.StatusNotFound)
 	return
 }
 
