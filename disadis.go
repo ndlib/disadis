@@ -88,14 +88,13 @@ func main() {
 		log.Printf("Error: Fedora address must be set. (--fedora <server addr>)")
 		os.Exit(1)
 	}
+	log.Printf("prefix %s", prefix)
 	ha := disseminator.NewHydraAuth(fedoraAddr, prefix)
 	if pubtktKey != "" {
 		ha.CurrentUser = disseminator.NewPubtktAuthFromKeyFile(pubtktKey)
 	}
-	http.Handle("/d/",
-		disseminator.NewDownloadHandler(nil,
-			ha,
-			disseminator.NewFedoraSource(fedoraAddr, prefix)))
+	ha.Handler = disseminator.NewDownloadHandler(disseminator.NewRemoteFedora(fedoraAddr, prefix))
+	http.Handle("/d/", http.StripPrefix("/d/", ha))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Println(r.URL)
 	})

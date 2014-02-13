@@ -16,14 +16,14 @@ func TestCanView(t *testing.T) {
 	var table = []struct {
 		user                         string
 		groups                       []string
-		allowed, registered, embargo bool
+		allowed, registered, embargo Authorization
 	}{
-		{"elephant", nil, true, true, false},                            // read person can read
-		{"xerxes", []string{"yak", "carrot"}, true, true, false},        // read group can read
-		{"kite", []string{"yak", "water"}, true, true, true},            // edit person can read
-		{"xerxes", []string{"yak", "water", "igloo"}, true, true, true}, // edit group can read
-		{"xerxes", []string{"kite"}, false, true, false},                // keep people and groups separate
-		{"", nil, false, false, false},                                  // public cannot read yet
+		{"elephant", nil, AuthAllow, AuthAllow, AuthDeny},                              // read person can read
+		{"xerxes", []string{"yak", "carrot"}, AuthAllow, AuthAllow, AuthDeny},          // read group can read
+		{"kite", []string{"yak", "water"}, AuthAllow, AuthAllow, AuthAllow},            // edit person can read
+		{"xerxes", []string{"yak", "water", "igloo"}, AuthAllow, AuthAllow, AuthAllow}, // edit group can read
+		{"xerxes", []string{"kite"}, AuthDeny, AuthAllow, AuthDeny},                    // keep people and groups separate
+		{"", nil, AuthDeny, AuthDeny, AuthDeny},                                        // public cannot read yet
 	}
 	var u User
 	for _, z := range table {
@@ -50,7 +50,7 @@ func TestCanView(t *testing.T) {
 		u.Id = z.user
 		u.Groups = z.groups
 		a := hr.canView(u)
-		if !a {
+		if a != AuthAllow {
 			t.Errorf("got %v with %v\n", a, z)
 		}
 	}
@@ -70,7 +70,7 @@ func TestCanView(t *testing.T) {
 		u.Id = z.user
 		u.Groups = z.groups
 		a := hr.canView(u)
-		if a {
+		if a == AuthAllow {
 			t.Errorf("got %v with %v\n", a, z)
 		}
 	}

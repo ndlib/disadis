@@ -4,18 +4,72 @@ import (
 	"encoding/xml"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
 func NewHydraAuth(fedoraPath, namespace string) *HydraAuth {
 	return &HydraAuth{
-		fedoraPrefix: fedoraPath + "objects/" + namespace,
+		fedora: NewRemoteFedora(fedoraPath, namespace),
 	}
 }
 
+// HydraAuth will validate requests against Hydra rights metadata stored
+// in some fedora instance. It can either be used as an http.Handler, wrapping
+// a target handler, or independently in your own handler.
+//
+// The RequestUser is used to determine the current user given a request.
+// It may make HTTP calls or perform database lookups to resolve things,
+// ultimately returning a username and a list of groups the user belongs to.
+// The zero value for the User is the anonymous user who belongs to no groups.
+//
+// To use it as a wrapping handler, give it a Handler to wrap and an optional
+// IdExtractor to return an object identifier given a URL. The default extractor
+// takes the first path component in the URL.
+// This interface may need to be generalized to be a
+//	func(*http.Request) string
+//
+// To just use the checking in your own handler call Check() directly.
 type HydraAuth struct {
-	CurrentUser  RequestUser // determines the current user
-	fedoraPrefix string      // location of fedora along with username and password
+	CurrentUser RequestUser // determines the current user
+	// Extract a Fedora object identifier from a URL
+	// If nil then the first component in the path is taken to be the identifier
+	IdExtractor func(string) string
+	Handler     http.Handler // handler to pass authorized requests to
+	fedora      Fedora       // interface to Fedora
+}
+
+func (ha *HydraAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if ha.Handler == nil {
+		http.Error(w, "404 Not found", http.StatusNotFound)
+		return
+	}
+	var id string
+	if ha.IdExtractor != nil {
+		id = ha.IdExtractor(r.URL.Path)
+	} else {
+		// default id extraction is the first path component
+		id = strings.TrimPrefix(r.URL.Path, "/")
+		// extract up to either the first "/" or the end of the string
+		j := strings.Index(id, "/")
+		if j != -1 {
+			id = id[0:j]
+		}
+	}
+	// TODO: scan id to ensure it is not malicious
+	switch ha.Check(r, id) {
+	case AuthDeny:
+		// TODO: add WWW-Authenticate header field
+		http.Error(w, "401 Unauthorized", http.StatusUnauthorized)
+	case AuthNotFound:
+		http.Error(w, "404 Not Found", http.StatusNotFound)
+	case AuthError:
+		http.Error(w, "500 Server Error", http.StatusInternalServerError)
+	case AuthAllow:
+		if ha.Handler != nil {
+			ha.Handler.ServeHTTP(w, r)
+		}
+	}
 }
 
 // A RequestUser returns the current user for a request
@@ -26,30 +80,37 @@ type RequestUser interface {
 }
 
 // A User is an identifier and a list of groups which the user belongs to.
-// The zero User represents an anonymous user.
+// The zero User represents the anonymous user.
 type User struct {
 	Id     string
 	Groups []string
 }
 
-// See if the item `id` is viewable by the current user in the request.
-// Returns true if the item can be viewed; false if the item cannot be viewed.
-//
-// The isThumb flag seems like a hack. Is there a better way? maybe have
-// Check reparse the request path?
-func (ha *HydraAuth) Check(r *http.Request, id string, isThumb bool) bool {
-	if isThumb {
-		return true
-	}
+type Authorization int
 
+const (
+	AuthDeny = iota
+	AuthAllow
+	AuthNotFound
+	AuthError
+)
+
+// Check determines whether fedora item id is viewable by the given request.
+// Returns true if the item can be viewed; false if the item cannot be viewed.
+// The id will be passed to Fedora unaltered, so it should have its prefixes,
+// if any, already added. For example,
+//	temp:ab12cd34
+// instead of
+//	ab12cd34
+func (ha *HydraAuth) Check(r *http.Request, id string) Authorization {
 	rights := ha.getRights(id)
 	if rights == nil {
-		return false
+		return AuthNotFound
 	}
 	if rights.isPublic() {
-		return true
+		return AuthAllow
 	}
-	var u User // default is the anon user
+	var u User // zero is the anon user
 	if ha.CurrentUser != nil {
 		u = ha.CurrentUser.User(r)
 	}
@@ -84,63 +145,43 @@ func (hr *hydraRights) isPublic() bool {
 }
 
 // Compare an items access rights against a User to see if view access should be
-// granted. It will return either `true' if the user is allowed to see the item
-// or 'false' if the user cannot see the item
-func (hr *hydraRights) canView(user User) bool {
+// granted. It will return AuthAllow if the user is allowed to see the item,
+// AuthDeny if the user cannot see the item, or one of the other authorization
+// codes if there is an error
+func (hr *hydraRights) canView(user User) Authorization {
 	if hr.version != "0.1" {
-		return false
+		return AuthError
 	}
 	if time.Now().Before(hr.embargo) {
 		// only edit people can view
 		if member(user.Id, hr.editPeople) ||
 			incommon(user.Groups, hr.editGroups) {
-			return true
+			return AuthAllow
 		}
-		return false
+		return AuthDeny
 	}
 
 	// public?
 	if member("public", hr.readGroups) || member("public", hr.editGroups) {
-		return true
+		return AuthAllow
 	}
 
 	// registered?
-	if user.Id != "" && (member("registered", hr.readGroups) || member("registered", hr.editGroups)) {
-		return true
+	if user.Id != "" &&
+		(member("registered", hr.readGroups) || member("registered", hr.editGroups)) {
+		return AuthAllow
 	}
-
 	if incommon(user.Groups, hr.readGroups) || incommon(user.Groups, hr.editGroups) {
-		return true
+		return AuthAllow
 	}
 	if member(user.Id, hr.readPeople) || member(user.Id, hr.editPeople) {
-		return true
+		return AuthAllow
 	}
-
-	return false
+	return AuthDeny
 }
 
 // the []string structures should be replaced by a generic set datatype.
 // perhaps a map[string]bool ?
-
-// is string 'a' a member of string list 'list'?
-func member(a string, list []string) bool {
-	for i := range list {
-		if a == list[i] {
-			return true
-		}
-	}
-	return false
-}
-
-// do lists 'a' and 'b' contain a member in common?
-func incommon(a, b []string) bool {
-	for i := range a {
-		if member(a[i], b) {
-			return true
-		}
-	}
-	return false
-}
 
 // rightsMetadata is used to decode the hydra rightsMetadata xml data
 type rightsMetadata struct {
@@ -160,22 +201,17 @@ type accessMetadata struct {
 //
 // TODO: add a cache with a timed expiry
 func (ha *HydraAuth) getRights(id string) *hydraRights {
-	s := ha.fedoraPrefix + id + "/datastreams/rightsMetadata/content"
-	log.Printf("getting rights %s", s)
-	r, err := http.Get(s)
+	log.Printf("getting rights %s", id)
+	log.Printf("%v", ha)
+	r, err := ha.fedora.GetDatastream(id, "rightsMetadata")
 	if err != nil {
 		log.Println(err)
 		return nil
 	}
-	defer r.Body.Close()
-
-	if r.StatusCode != 200 {
-		log.Printf("Got status %d from fedora", r.StatusCode)
-		return nil
-	}
+	defer r.Close()
 
 	var rights rightsMetadata
-	d := xml.NewDecoder(r.Body)
+	d := xml.NewDecoder(r)
 	err = d.Decode(&rights)
 	if err != nil {
 		log.Printf("Decode error %s", err.Error())
