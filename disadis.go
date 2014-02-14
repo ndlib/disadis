@@ -92,6 +92,8 @@ func main() {
 	ha := disseminator.NewHydraAuth(fedoraAddr, prefix)
 	if pubtktKey != "" {
 		ha.CurrentUser = disseminator.NewPubtktAuthFromKeyFile(pubtktKey)
+	} else {
+		ha.CurrentUser = &disseminator.DeviseAuth{}
 	}
 	ha.Handler = disseminator.NewDownloadHandler(disseminator.NewRemoteFedora(fedoraAddr, prefix))
 	http.Handle("/", ha)
