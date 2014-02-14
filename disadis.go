@@ -94,10 +94,7 @@ func main() {
 		ha.CurrentUser = disseminator.NewPubtktAuthFromKeyFile(pubtktKey)
 	}
 	ha.Handler = disseminator.NewDownloadHandler(disseminator.NewRemoteFedora(fedoraAddr, prefix))
-	http.Handle("/d/", http.StripPrefix("/d/", ha))
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Println(r.URL)
-	})
+	http.Handle("/", ha)
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)

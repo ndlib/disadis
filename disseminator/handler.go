@@ -37,42 +37,42 @@ func NewDownloadHandler(f Fedora) http.Handler {
 	}
 }
 
-func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var (
-		path       string
-		components []string
-		dsname     string = "contents"
-		content    io.ReadCloser
-		err        error
-	)
+func notFound(w http.ResponseWriter) {
+	http.Error(w, "404 Not Found", http.StatusNotFound)
+}
 
-	log.Println("Start")
+func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Println("%s %s", r.Method, r.URL.Path)
 
 	if r.Method != "GET" {
-		goto notfound
+		notFound(w)
+		return
 	}
 
 	// "" / "id" ( / thumbnail )?
-
-	path = strings.TrimPrefix(r.URL.Path, "/")
+	path := strings.TrimPrefix(r.URL.Path, "/")
 	path = strings.TrimSuffix(path, "/")
-	components = strings.SplitN(path, "/", 2)
+	components := strings.SplitN(path, "/", 2)
 
+	var dsname = "content"
 	switch {
 	case len(components) > 2 || len(components) == 0:
-		goto notfound
+		notFound(w)
+		return
 	case len(components) == 2:
 		if components[1] != "thumbnail" {
-			goto notfound
+			notFound(w)
+			return
 		}
 		dsname = "thumbnail"
 	}
 
-	content, err = dh.fedora.GetDatastream(components[0], dsname)
+	content, err := dh.fedora.GetDatastream(components[0], dsname)
 	if err != nil {
 		switch err {
 		case FedoraNotFound:
-			goto notfound
+			notFound(w)
+			return
 		default:
 			log.Printf("Got fedora error: %s", err)
 			http.Error(w, "500 Internal Error", http.StatusInternalServerError)
@@ -84,9 +84,5 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//dh.source.Get(w, components[0], isThumb)
 	io.Copy(w, content)
 	log.Println("End")
-	return
-
-notfound:
-	http.Error(w, "404 Not Found", http.StatusNotFound)
 	return
 }

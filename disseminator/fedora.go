@@ -46,7 +46,7 @@ type remoteFedora struct {
 // The returned stream needs to be closed when finished.
 func (rf *remoteFedora) GetDatastream(id, dsname string) (io.ReadCloser, error) {
 	// TODO: make this joining smarter wrt not duplicating slashes
-	var path string = rf.hostpath + rf.namespace + id + "/datastreams/" + dsname + "/content"
+	var path string = rf.hostpath + "objects/" + rf.namespace + id + "/datastreams/" + dsname + "/content"
 	r, err := http.Get(path)
 	if err != nil {
 		return nil, err
