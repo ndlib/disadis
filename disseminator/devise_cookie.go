@@ -7,20 +7,12 @@ import (
 	"net/http"
 	"net/url"
 
-	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/mattn/go-sqlite3"
-
 	// I know. Two different libraries just to decode a rails cookie.
 	// One is to verify and decrypt the cookie, the other is to unmarshal
 	// the data. This unmarshaling library is fragile, but it works well
 	// enough until we serialize the session to JSON.
 	"github.com/adeven/gorails/marshal"
 	"github.com/mattetti/goRailsYourself/crypto"
-)
-
-var (
-	unauthorizedUser = errors.New("Unauthorized user")
-	invalidAuthData  = errors.New("Invalid auth data")
 )
 
 // DeviseAuth will only pass on requests which have a valid RoR devise cookie.
@@ -33,7 +25,7 @@ var (
 type DeviseAuth struct {
 	SecretBase []byte     // base secret for verifying the cookie
 	CookieName string     // the name of the auth cookie
-	lookup     LookupUser // procedure to turn user id to a User
+	Lookup     LookupUser // procedure to turn user id to a User
 	verifier   *crypto.MessageVerifier
 }
 
@@ -47,7 +39,7 @@ type LookupUser interface {
 }
 
 func (d *DeviseAuth) User(r *http.Request) User {
-	if d.lookup == nil {
+	if d.Lookup == nil {
 		log.Printf("ERROR lookup is nil")
 		return User{}
 	}
@@ -64,7 +56,7 @@ func (d *DeviseAuth) User(r *http.Request) User {
 		return User{}
 	}
 	// lookup user in database
-	u, err := d.lookup.Lookup(uid)
+	u, err := d.Lookup.Lookup(uid)
 	if err != nil {
 		log.Printf("ERROR looking up user %d: %s", uid, err)
 	}
@@ -145,20 +137,29 @@ type DatabaseUser struct {
 // If the user doesn't exist or there is some other error, then
 // the zero user is returned.
 func (d *DatabaseUser) Lookup(uid int) (User, error) {
-	var username, groups string
-	row := d.Db.QueryRow("SELECT username, groups FROM User WHERE uid=?", uid)
+	var username, groups sql.NullString
+	row := d.Db.QueryRow("SELECT username, group_list FROM users WHERE uid=?", uid)
 	err := row.Scan(&username, &groups)
 	switch {
 	case err == sql.ErrNoRows:
 		// no such user
+		log.Printf("no user %d", uid)
 		return User{}, nil
 	case err != nil:
 		log.Printf("Database Error: %s", err)
 		return User{}, err
-	default:
+	}
+	if username.Valid {
+		var groupList []string
+		if groups.Valid {
+			// split out groups
+			groupList = []string{groups.String}
+		}
 		return User{
-			Id:     username,
-			Groups: []string{groups},
+			Id:     username.String,
+			Groups: groupList,
 		}, nil
 	}
+	log.Printf("User %d has no username", uid)
+	return User{}, nil
 }

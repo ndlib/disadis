@@ -1,16 +1,23 @@
 package disseminator
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"testing"
+
+	// using this library makes the tests fail. Is there something with QueryRow?
+	//_ "github.com/mattn/go-sqlite3"
+
+	// yet this sqlite library has the tests passing
+	_ "code.google.com/p/go-sqlite/go1/sqlite3"
 )
 
 func TestDevise(t *testing.T) {
 	var d = &DeviseAuth{
 		SecretBase: []byte("0123456789abcdefghijklmnopqrstuvwxyz"),
 		CookieName: "_test_session",
-		lookup:     &NoLookup{},
+		Lookup:     &NoLookup{},
 	}
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
@@ -32,6 +39,59 @@ type NoLookup struct{}
 
 func (n *NoLookup) Lookup(uid int) (User, error) {
 	return User{Id: fmt.Sprintf("User-%d", uid)}, nil
+}
+
+const dbSchema = `CREATE TABLE users (
+uid INTEGER,
+username STRING,
+group_list STRING
+);
+INSERT INTO users VALUES (0, "king", null);
+INSERT INTO users VALUES (1, "queen", null);
+INSERT INTO users VALUES (3, null, null);
+`
+
+func TestDatabaseLookup(t *testing.T) {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Skip(err)
+		return
+	}
+	defer db.Close()
+
+	_, err = db.Exec(dbSchema)
+	if err != nil {
+		t.Log(err)
+	}
+	d := &DatabaseUser{Db: db}
+
+	var username sql.NullString
+	row := db.QueryRow("SELECT username FROM users WHERE uid=?", 0)
+	err = row.Scan(&username)
+	if err != nil {
+		t.Logf("err = %s", err)
+	} else {
+		t.Logf("username = %#v", username)
+	}
+
+	table := []struct {
+		uid int
+		u   User
+	}{
+		{0, User{"king", nil}},
+		{1, User{"queen", nil}},
+		{1000, User{"", nil}},
+	}
+
+	for i, item := range table {
+		u, _ := d.Lookup(item.uid)
+		if u.Id != item.u.Id {
+			t.Errorf("User id %d returned %#v", item.uid, u)
+		}
+		if len(u.Groups) != len(item.u.Groups) {
+			t.Errorf("Wrong group lengths (index %d)", i)
+		}
+	}
 }
 
 func TestUnmarshal(t *testing.T) {
