@@ -103,11 +103,11 @@ func (pa *PubtktAuth) verifySig(text, signature string) bool {
 	case *dsa.PublicKey:
 		dsaSig := new(dsaSignature)
 		if _, err := asn1.Unmarshal(sig, dsaSig); err != nil {
-			log.Println("problem decoding dsa", err)
+			// log.Println("problem decoding dsa", err)
 			return false
 		}
 		if dsaSig.R.Sign() <= 0 || dsaSig.S.Sign() <= 0 {
-			log.Println("509: DSA signature contained zero or negative values")
+			// log.Println("509: DSA signature contained zero or negative values")
 			return false
 		}
 		return dsa.Verify(pub, digest, dsaSig.R, dsaSig.S)
@@ -191,6 +191,6 @@ func parseTicket(text string) *Pubtkt {
 			result.UData = kv[1]
 		}
 	}
-	log.Printf("Decoded ticket %v", result)
+	//log.Printf("Decoded ticket %v", result)
 	return result
 }
