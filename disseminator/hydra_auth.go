@@ -107,13 +107,17 @@ func (ha *HydraAuth) Check(r *http.Request, id string) Authorization {
 	if rights == nil {
 		return AuthNotFound
 	}
-	if rights.isPublic() {
+	var u User // zero is the anon user
+	// first try with the anon user to see if item is viewable by the public.
+	if rights.canView(u) == AuthAllow {
 		return AuthAllow
 	}
-	var u User // zero is the anon user
-	if ha.CurrentUser != nil {
-		u = ha.CurrentUser.User(r)
+	// now we need to decode the current user
+	if ha.CurrentUser == nil {
+		return AuthDeny
 	}
+	u = ha.CurrentUser.User(r)
+	log.Printf("Found user %#v", u)
 	return rights.canView(u)
 }
 
