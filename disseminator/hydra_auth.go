@@ -103,13 +103,16 @@ const (
 // instead of
 //	ab12cd34
 func (ha *HydraAuth) Check(r *http.Request, id string) Authorization {
+	log.Printf("Checking rights for %s", id)
 	rights := ha.getRights(id)
 	if rights == nil {
+		log.Printf("Not Found %s", id)
 		return AuthNotFound
 	}
 	var u User // zero is the anon user
 	// first try with the anon user to see if item is viewable by the public.
 	if rights.canView(u) == AuthAllow {
+		log.Printf("Is Public: %s", id)
 		return AuthAllow
 	}
 	// now we need to decode the current user
@@ -117,7 +120,7 @@ func (ha *HydraAuth) Check(r *http.Request, id string) Authorization {
 		return AuthDeny
 	}
 	u = ha.CurrentUser.User(r)
-	log.Printf("Found user %#v", u)
+	log.Printf("Found user '%s', %#v", u.Id, u.Groups)
 	return rights.canView(u)
 }
 
@@ -205,8 +208,6 @@ type accessMetadata struct {
 //
 // TODO: add a cache with a timed expiry
 func (ha *HydraAuth) getRights(id string) *hydraRights {
-	log.Printf("getting rights %s", id)
-	log.Printf("%v", ha)
 	r, err := ha.fedora.GetDatastream(id, "rightsMetadata")
 	if err != nil {
 		log.Println(err)
