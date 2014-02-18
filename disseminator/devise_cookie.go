@@ -45,11 +45,11 @@ func (d *DeviseAuth) User(r *http.Request) User {
 	}
 	cookie, err := r.Cookie(d.CookieName)
 	if err != nil {
-		return User{Id: err.Error()}
+		return User{}
 	}
 	session, err := url.QueryUnescape(cookie.Value)
 	if err != nil {
-		return User{Id: err.Error()}
+		return User{}
 	}
 	uid := d.decodeUserId(session)
 	if uid < 0 {
@@ -138,7 +138,7 @@ type DatabaseUser struct {
 // the zero user is returned.
 func (d *DatabaseUser) Lookup(uid int) (User, error) {
 	var username, groups sql.NullString
-	row := d.Db.QueryRow("SELECT username, group_list FROM users WHERE uid=?", uid)
+	row := d.Db.QueryRow("SELECT username, group_list FROM users WHERE id=?", uid)
 	err := row.Scan(&username, &groups)
 	switch {
 	case err == sql.ErrNoRows:
