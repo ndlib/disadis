@@ -42,7 +42,7 @@ func notFound(w http.ResponseWriter) {
 }
 
 func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Println("%s %s", r.Method, r.URL.Path)
+	log.Printf("%s %s", r.Method, r.URL.Path)
 
 	if r.Method != "GET" {
 		notFound(w)
