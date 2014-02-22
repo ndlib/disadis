@@ -208,7 +208,7 @@ type accessMetadata struct {
 //
 // TODO: add a cache with a timed expiry
 func (ha *HydraAuth) getRights(id string) *hydraRights {
-	r, err := ha.fedora.GetDatastream(id, "rightsMetadata")
+	r, _, err := ha.fedora.GetDatastream(id, "rightsMetadata")
 	if err != nil {
 		log.Println(err)
 		return nil

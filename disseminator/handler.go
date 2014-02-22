@@ -67,7 +67,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		dsname = "thumbnail"
 	}
 
-	content, err := dh.fedora.GetDatastream(components[0], dsname)
+	content, info, err := dh.fedora.GetDatastream(components[0], dsname)
 	if err != nil {
 		switch err {
 		case FedoraNotFound:
@@ -81,7 +81,12 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer content.Close()
 
-	//dh.source.Get(w, components[0], isThumb)
+	w.Header().Set("Content-Type", info.Type)
+	w.Header().Set("Content-Length", info.Length)
+	w.Header().Set("Content-Disposition", info.Disposition)
+	w.Header().Set("Content-Transfer-Encoding", "binary")
+	w.Header().Set("Cache-Control", "private")
+
 	io.Copy(w, content)
 	log.Println("End")
 	return

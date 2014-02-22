@@ -19,7 +19,15 @@ var (
 type Fedora interface {
 	// Return the contents of the dsname datastream of object id.
 	// You are expected to close it when you are finished.
-	GetDatastream(id, dsname string) (io.ReadCloser, error)
+	GetDatastream(id, dsname string) (io.ReadCloser, ContentInfo, error)
+}
+
+type ContentInfo struct {
+	// These fields are from the headers in the fedora response
+	// They may be empty strings, representing that the value is unknown
+	Type string
+	Length string
+	Disposition string
 }
 
 // Create a reference to a remote Fedora instance.
@@ -44,25 +52,29 @@ type remoteFedora struct {
 
 // returns the contents of the datastream `dsname`.
 // The returned stream needs to be closed when finished.
-func (rf *remoteFedora) GetDatastream(id, dsname string) (io.ReadCloser, error) {
+func (rf *remoteFedora) GetDatastream(id, dsname string) (io.ReadCloser, ContentInfo, error) {
 	// TODO: make this joining smarter wrt not duplicating slashes
 	var path string = rf.hostpath + "objects/" + rf.namespace + id + "/datastreams/" + dsname + "/content"
+	var info ContentInfo
 	r, err := http.Get(path)
 	if err != nil {
-		return nil, err
+		return nil, info, err
 	}
 	if r.StatusCode != 200 {
 		r.Body.Close()
 		switch r.StatusCode {
 		case 404:
-			return nil, FedoraNotFound
+			return nil, info, FedoraNotFound
 		case 401:
-			return nil, FedoraNotAuthorized
+			return nil, info, FedoraNotAuthorized
 		default:
-			return nil, fmt.Errorf("Got status %d from fedora", r.StatusCode)
+			return nil, info, fmt.Errorf("Got status %d from fedora", r.StatusCode)
 		}
 	}
-	return r.Body, nil
+	info.Type = r.Header.Get("Content-Type")
+	info.Length = r.Header.Get("Content-Length")
+	info.Disposition = r.Header.Get("Content-Disposition")
+	return r.Body, info, nil
 }
 
 func newTestFedora() *TestFedora {
