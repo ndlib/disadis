@@ -42,7 +42,7 @@ func (n *NoLookup) Lookup(uid int) (User, error) {
 }
 
 const dbSchema = `CREATE TABLE users (
-uid INTEGER,
+id INTEGER,
 username STRING,
 group_list STRING
 );
