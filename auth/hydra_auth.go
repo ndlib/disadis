@@ -37,8 +37,8 @@ type HydraAuth struct {
 	// Extract a Fedora object identifier from a URL
 	// If nil then the first component in the path is taken to be the identifier
 	IdExtractor func(string) string
-	Handler     http.Handler // handler to pass authorized requests to
-	fedora      fedora.Fedora       // interface to Fedora
+	Handler     http.Handler  // handler to pass authorized requests to
+	fedora      fedora.Fedora // interface to Fedora
 }
 
 func (ha *HydraAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {

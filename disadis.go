@@ -61,17 +61,17 @@ func signalHandler(sig <-chan os.Signal, logw Reopener) {
 
 type Config struct {
 	General struct {
-		Port string
+		Port         string
 		Log_filename string
-		Fedora_addr string
-		Prefix string
+		Fedora_addr  string
+		Prefix       string
 	}
 	Pubtkt struct {
 		Key_file string
 	}
 	Rails struct {
-		Secret string
-		Cookie string
+		Secret   string
+		Cookie   string
 		Database string
 	}
 }
@@ -84,10 +84,10 @@ func main() {
 		pubtktKey   string
 		fedoraAddr  string
 		prefix      string
-		secret string
-		database string
-		cookieName string
-		config Config
+		secret      string
+		database    string
+		cookieName  string
+		config      Config
 	)
 
 	flag.StringVar(&port, "port", "8080", "port to listen on")
@@ -164,7 +164,7 @@ func main() {
 		ha.CurrentUser = &auth.DeviseAuth{
 			SecretBase: []byte(secret),
 			CookieName: cookieName,
-			Lookup: &auth.DatabaseUser{Db: db},
+			Lookup:     &auth.DatabaseUser{Db: db},
 		}
 	default:
 		log.Printf("Warning: No authorization method given.")
@@ -174,7 +174,7 @@ func main() {
 	}
 	/* here is where we would add other handlers to reverse proxy, e.g. */
 	ha.Handler = disseminator.NewDownloadHandler(fedora)
-	http.HandleFunc("/", func (w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%s %s", r.Method, r.RequestURI)
 		ha.ServeHTTP(w, r)
 	})
