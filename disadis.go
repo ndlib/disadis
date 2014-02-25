@@ -13,7 +13,9 @@ import (
 	"code.google.com/p/gcfg"
 	_ "github.com/go-sql-driver/mysql"
 
+	"github.com/dbrower/disadis/auth"
 	"github.com/dbrower/disadis/disseminator"
+	"github.com/dbrower/disadis/fedora"
 )
 
 type Reopener interface {
@@ -137,12 +139,12 @@ func main() {
 		os.Exit(1)
 	}
 	log.Printf("Using prefix '%s'", prefix)
-	fedora := disseminator.NewRemoteFedora(fedoraAddr, prefix)
-	ha := disseminator.NewHydraAuth(fedoraAddr, prefix)
+	fedora := fedora.NewRemote(fedoraAddr, prefix)
+	ha := auth.NewHydraAuth(fedoraAddr, prefix)
 	switch {
 	case pubtktKey != "":
 		log.Printf("Using pubtkt %s", pubtktKey)
-		ha.CurrentUser = disseminator.NewPubtktAuthFromKeyFile(pubtktKey)
+		ha.CurrentUser = auth.NewPubtktAuthFromKeyFile(pubtktKey)
 	case secret != "":
 		log.Printf("Using Rails 3 cookies")
 		if cookieName == "" {
@@ -159,10 +161,10 @@ func main() {
 			log.Printf("Error opening database connection: %s", err)
 			break
 		}
-		ha.CurrentUser = &disseminator.DeviseAuth{
+		ha.CurrentUser = &auth.DeviseAuth{
 			SecretBase: []byte(secret),
 			CookieName: cookieName,
-			Lookup: &disseminator.DatabaseUser{Db: db},
+			Lookup: &auth.DatabaseUser{Db: db},
 		}
 	default:
 		log.Printf("Warning: No authorization method given.")
