@@ -47,17 +47,10 @@ func (ha *HydraAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var id string
-	if ha.IdExtractor != nil {
-		id = ha.IdExtractor(r.URL.Path)
-	} else {
-		// default id extraction is the first path component
-		id = strings.TrimPrefix(r.URL.Path, "/")
-		// extract up to either the first "/" or the end of the string
-		j := strings.Index(id, "/")
-		if j != -1 {
-			id = id[0:j]
-		}
+	if ha.IdExtractor == nil {
+		ha.IdExtractor = FirstPathElement
 	}
+	id = ha.IdExtractor(r.URL.Path)
 	// TODO: scan id to ensure it is not malicious
 	switch ha.Check(r, id) {
 	case AuthDeny:
@@ -72,6 +65,18 @@ func (ha *HydraAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ha.Handler.ServeHTTP(w, r)
 		}
 	}
+}
+
+// FirstPathElement returns the first path component, minus
+// any leading or trailing slashes.
+func FirstPathElement(s string) string {
+	id := strings.TrimPrefix(s, "/")
+	// extract up to either the first "/" or the end of the string
+	j := strings.Index(id, "/")
+	if j != -1 {
+		id = id[0:j]
+	}
+	return id
 }
 
 // A RequestUser returns the current user for a request
