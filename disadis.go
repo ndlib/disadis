@@ -174,7 +174,10 @@ func main() {
 	}
 	/* here is where we would add other handlers to reverse proxy, e.g. */
 	ha.Handler = disseminator.NewDownloadHandler(fedora)
-	http.Handle("/", ha)
+	http.HandleFunc("/", func (w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s %s", r.Method, r.RequestURI)
+		ha.ServeHTTP(w, r)
+	})
 
 	/* Enter main loop */
 	err = http.ListenAndServe(":"+port, nil)
