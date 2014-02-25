@@ -1,4 +1,4 @@
-package disseminator
+package auth
 
 import (
 	"encoding/xml"
@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/dbrower/disadis/fedora"
 )
 
 func NewHydraAuth(fedoraPath, namespace string) *HydraAuth {
 	return &HydraAuth{
-		fedora: NewRemoteFedora(fedoraPath, namespace),
+		fedora: fedora.NewRemote(fedoraPath, namespace),
 	}
 }
 
@@ -36,7 +38,7 @@ type HydraAuth struct {
 	// If nil then the first component in the path is taken to be the identifier
 	IdExtractor func(string) string
 	Handler     http.Handler // handler to pass authorized requests to
-	fedora      Fedora       // interface to Fedora
+	fedora      fedora.Fedora       // interface to Fedora
 }
 
 func (ha *HydraAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {

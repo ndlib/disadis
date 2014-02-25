@@ -1,4 +1,4 @@
-package disseminator
+package auth
 
 import (
 	"testing"
