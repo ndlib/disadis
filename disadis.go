@@ -13,7 +13,9 @@ import (
 	"code.google.com/p/gcfg"
 	_ "github.com/go-sql-driver/mysql"
 
+	"github.com/dbrower/disadis/auth"
 	"github.com/dbrower/disadis/disseminator"
+	"github.com/dbrower/disadis/fedora"
 )
 
 type Reopener interface {
@@ -59,17 +61,17 @@ func signalHandler(sig <-chan os.Signal, logw Reopener) {
 
 type Config struct {
 	General struct {
-		Port string
+		Port         string
 		Log_filename string
-		Fedora_addr string
-		Prefix string
+		Fedora_addr  string
+		Prefix       string
 	}
 	Pubtkt struct {
 		Key_file string
 	}
 	Rails struct {
-		Secret string
-		Cookie string
+		Secret   string
+		Cookie   string
 		Database string
 	}
 }
@@ -82,10 +84,10 @@ func main() {
 		pubtktKey   string
 		fedoraAddr  string
 		prefix      string
-		secret string
-		database string
-		cookieName string
-		config Config
+		secret      string
+		database    string
+		cookieName  string
+		config      Config
 	)
 
 	flag.StringVar(&port, "port", "8080", "port to listen on")
@@ -137,12 +139,12 @@ func main() {
 		os.Exit(1)
 	}
 	log.Printf("Using prefix '%s'", prefix)
-	fedora := disseminator.NewRemoteFedora(fedoraAddr, prefix)
-	ha := disseminator.NewHydraAuth(fedoraAddr, prefix)
+	fedora := fedora.NewRemote(fedoraAddr, prefix)
+	ha := auth.NewHydraAuth(fedoraAddr, prefix)
 	switch {
 	case pubtktKey != "":
 		log.Printf("Using pubtkt %s", pubtktKey)
-		ha.CurrentUser = disseminator.NewPubtktAuthFromKeyFile(pubtktKey)
+		ha.CurrentUser = auth.NewPubtktAuthFromKeyFile(pubtktKey)
 	case secret != "":
 		log.Printf("Using Rails 3 cookies")
 		if cookieName == "" {
@@ -159,10 +161,10 @@ func main() {
 			log.Printf("Error opening database connection: %s", err)
 			break
 		}
-		ha.CurrentUser = &disseminator.DeviseAuth{
+		ha.CurrentUser = &auth.DeviseAuth{
 			SecretBase: []byte(secret),
 			CookieName: cookieName,
-			Lookup: &disseminator.DatabaseUser{Db: db},
+			Lookup:     &auth.DatabaseUser{Db: db},
 		}
 	default:
 		log.Printf("Warning: No authorization method given.")
@@ -172,7 +174,10 @@ func main() {
 	}
 	/* here is where we would add other handlers to reverse proxy, e.g. */
 	ha.Handler = disseminator.NewDownloadHandler(fedora)
-	http.Handle("/", ha)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s %s", r.Method, r.RequestURI)
+		ha.ServeHTTP(w, r)
+	})
 
 	/* Enter main loop */
 	err = http.ListenAndServe(":"+port, nil)

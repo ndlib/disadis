@@ -1,4 +1,11 @@
-package disseminator
+/*
+Fedora provides a thin wrapper around the Fedora REST API.
+It is not complete. Only methods needed by disadis have been
+added.
+
+Perhaps it might be advisable to make this its own package.
+*/
+package fedora
 
 import (
 	"bytes"
@@ -37,7 +44,7 @@ type ContentInfo struct {
 // This reference does not buffer or cache Fedora responses.
 // The namespace is of the form "temp:". It will be prefixed in front of
 // all object identifiers.
-func NewRemoteFedora(fedoraPath string, namespace string) Fedora {
+func NewRemote(fedoraPath string, namespace string) Fedora {
 	rf := &remoteFedora{hostpath: fedoraPath, namespace: namespace}
 	if rf.hostpath[len(rf.hostpath)-1] != '/' {
 		rf.hostpath = rf.hostpath + "/"

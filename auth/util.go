@@ -1,4 +1,4 @@
-package disseminator
+package auth
 
 // is string 'a' a member of string list 'list'?
 func member(a string, list []string) bool {
