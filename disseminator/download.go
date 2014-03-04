@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/dbrower/disadis/fedora"
 )
 
 // Handle two types of routes
@@ -28,10 +30,10 @@ import (
 //	http.Handle("/d/", http.StripPrefix("/d/", ha))
 //	return http.ListenAndServe(":"+port, nil)
 type DownloadHandler struct {
-	fedora Fedora
+	fedora fedora.Fedora
 }
 
-func NewDownloadHandler(f Fedora) http.Handler {
+func NewDownloadHandler(f fedora.Fedora) http.Handler {
 	return &DownloadHandler{
 		fedora: f,
 	}
@@ -70,7 +72,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	content, info, err := dh.fedora.GetDatastream(components[0], dsname)
 	if err != nil {
 		switch err {
-		case FedoraNotFound:
+		case fedora.FedoraNotFound:
 			notFound(w)
 			return
 		default:
