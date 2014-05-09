@@ -101,11 +101,10 @@ type User struct {
 type Authorization int
 
 const (
-	// AuthDeny means the given user should not see the given object.
-	AuthDeny Authorization = iota
-	AuthAllow	// the user should see the object
-	AuthNotFound	// the object was not found
-	AuthError	// there was an error doing the verification
+	AuthDeny     Authorization = iota // the user should NOT see the object
+	AuthAllow                         // the user should see the object
+	AuthNotFound                      // the object was not found
+	AuthError                         // there was an error doing the verification
 )
 
 // Check determines whether fedora item id is viewable by the given request.
