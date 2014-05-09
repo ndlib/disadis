@@ -18,6 +18,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dbrower/disadis/timecache"
 )
 
 // TODO: add better logging to help track down ticket errors?
@@ -25,7 +27,10 @@ import (
 // NewPubtktAuth creates a pubtkt authorization from an arbitrary data buffer.
 // It is suggested to use NewPubtktAuthFromKeyFile.
 func NewPubtktAuth(publicKey interface{}) *PubtktAuth {
-	return &PubtktAuth{publicKey: publicKey}
+	return &PubtktAuth{
+		publicKey: publicKey,
+		cache:     timecache.New(100, 24*time.Hour),
+	}
 }
 
 // NewPubtktAuthFromKeyFile takes the name of a PEM public key file
@@ -61,6 +66,7 @@ func NewPubtktAuthFromPEM(pemtext []byte) *PubtktAuth {
 // of this type
 type PubtktAuth struct {
 	publicKey interface{}
+	cache     timecache.Cache
 }
 
 // User returns the user associated with the current request, using pubtkt authentication
@@ -77,13 +83,26 @@ func (pa *PubtktAuth) User(r *http.Request) User {
 	log.Printf("Found pubtkt %s", pubtkt)
 
 	// verify the ticket
-	i := strings.LastIndex(pubtkt, ";sig=")
-	if i == -1 || !pa.verifySig(pubtkt[:i], pubtkt[i+5:]) {
-		log.Printf("ticket sig failed")
-		return User{}
-	}
+	// only valid tickets are put in the cache
+	var t *Pubtkt
+	v, err := pa.cache.Get(pubtkt)
+	if err == nil {
+		var ok bool
+		t, ok = v.(*Pubtkt)
+		if !ok {
+			log.Printf("Error casting Pubtkt from cache")
+			return User{}
+		}
+	} else {
+		i := strings.LastIndex(pubtkt, ";sig=")
+		if i == -1 || !pa.verifySig(pubtkt[:i], pubtkt[i+5:]) {
+			log.Printf("ticket sig failed")
+			return User{}
+		}
 
-	t := parseTicket(pubtkt[:i])
+		t = parseTicket(pubtkt[:i])
+		pa.cache.Add(pubtkt, t)
+	}
 
 	if !verifyTicket(r, t) {
 		return User{}
