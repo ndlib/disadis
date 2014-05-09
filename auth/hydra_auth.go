@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dbrower/disadis/fedora"
+	"github.com/dbrower/disadis/timecache"
 )
 
 // NewHydraAuth makes a new HydraAuth using the given fedoraPath
@@ -16,6 +17,7 @@ import (
 func NewHydraAuth(fedoraPath, namespace string) *HydraAuth {
 	return &HydraAuth{
 		fedora: fedora.NewRemote(fedoraPath, namespace),
+		cache:  timecache.New(100, 30*time.Second),
 	}
 }
 
@@ -40,8 +42,9 @@ type HydraAuth struct {
 	// Extract a Fedora object identifier from a URL
 	// If nil then the first component in the path is taken to be the identifier
 	IdExtractor func(string) string
-	Handler     http.Handler  // handler to pass authorized requests to
-	fedora      fedora.Fedora // interface to Fedora
+	Handler     http.Handler    // handler to pass authorized requests to
+	fedora      fedora.Fedora   // interface to Fedora
+	cache       timecache.Cache // Cache decoded object rights
 }
 
 func (ha *HydraAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -220,6 +223,13 @@ type accessMetadata struct {
 //
 // TODO: add a cache with a timed expiry
 func (ha *HydraAuth) getRights(id string) *hydraRights {
+	v, err := ha.cache.Get(id)
+	if err != nil {
+		result, ok := v.(*hydraRights)
+		if ok {
+			return result
+		}
+	}
 	r, _, err := ha.fedora.GetDatastream(id, "rightsMetadata")
 	if err != nil {
 		log.Println(err)
@@ -257,5 +267,6 @@ func (ha *HydraAuth) getRights(id string) *hydraRights {
 		result.embargo = t
 	}
 
+	ha.cache.Add(id, result)
 	return result
 }
