@@ -58,7 +58,7 @@ func NewPubtktAuthFromPEM(pemtext []byte) *PubtktAuth {
 	if err != nil {
 		panic(err)
 	}
-	return &PubtktAuth{publicKey: key}
+	return NewPubtktAuth(key)
 }
 
 // PubtktAuth implements the RequestUser interface.
