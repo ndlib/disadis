@@ -22,10 +22,13 @@ import (
 
 // TODO: add better logging to help track down ticket errors?
 
+// NewPubtktAuth creates a pubtkt authorization from an arbitrary data buffer.
+// It is suggested to use NewPubtktAuthFromKeyFile.
 func NewPubtktAuth(publicKey interface{}) *PubtktAuth {
 	return &PubtktAuth{publicKey: publicKey}
 }
 
+// NewPubtktAuthFromKeyFile takes the name of a PEM public key file
 func NewPubtktAuthFromKeyFile(filename string) *PubtktAuth {
 	f, err := os.Open(filename)
 	if err != nil {
@@ -39,6 +42,8 @@ func NewPubtktAuthFromKeyFile(filename string) *PubtktAuth {
 	return NewPubtktAuthFromPEM(buf)
 }
 
+// NewPubtktAuthFromPEM takes a PEM encoded block giving the public key to use
+// for decoding.
 func NewPubtktAuthFromPEM(pemtext []byte) *PubtktAuth {
 	p, _ := pem.Decode(pemtext)
 	if p == nil {
@@ -51,10 +56,14 @@ func NewPubtktAuthFromPEM(pemtext []byte) *PubtktAuth {
 	return &PubtktAuth{publicKey: key}
 }
 
+// PubtktAuth implements the RequestUser interface.
+// Use NewPubtktAuthFromPEM or NewPubtktAuthFromKeyFile to create instances
+// of this type
 type PubtktAuth struct {
 	publicKey interface{}
 }
 
+// User returns the user associated with the current request, using pubtkt authentication
 func (pa *PubtktAuth) User(r *http.Request) User {
 	cookie, err := r.Cookie("auth_pubtkt")
 	if err != nil {
@@ -80,7 +89,7 @@ func (pa *PubtktAuth) User(r *http.Request) User {
 		return User{}
 	}
 
-	return User{Id: t.Uid, Groups: t.Tokens}
+	return User{Id: t.UID, Groups: t.Tokens}
 }
 
 // verify the message text against signature using the public key
@@ -120,8 +129,9 @@ type dsaSignature struct {
 	R, S *big.Int
 }
 
+// Pubtkt holds the decoded contents of a pubtkt
 type Pubtkt struct {
-	Uid         string
+	UID         string
 	ClientIP    string
 	ValidUntil  time.Time
 	GracePeriod time.Time
@@ -170,7 +180,7 @@ func parseTicket(text string) *Pubtkt {
 		}
 		switch kv[0] {
 		case "uid":
-			result.Uid = kv[1]
+			result.UID = kv[1]
 		case "cip":
 			result.ClientIP = kv[1]
 		case "validuntil":

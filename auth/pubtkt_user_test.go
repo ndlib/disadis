@@ -12,11 +12,11 @@ func TestParseTicket(t *testing.T) {
 		u Pubtkt
 	}{
 		{s: "uid=yyy;validuntil=123456789;tokens=;udata=;sig=xxx",
-			u: Pubtkt{Uid: "yyy", ValidUntil: time.Unix(123456789, 0)}},
+			u: Pubtkt{UID: "yyy", ValidUntil: time.Unix(123456789, 0)}},
 		{s: "uid=yyy;validuntil=123456789;sig=xxx",
-			u: Pubtkt{Uid: "yyy", ValidUntil: time.Unix(123456789, 0)}},
+			u: Pubtkt{UID: "yyy", ValidUntil: time.Unix(123456789, 0)}},
 		{s: "uid=yyy;validuntil=123456789;tokens=a,b,c;sig=xxx",
-			u: Pubtkt{Uid: "yyy",
+			u: Pubtkt{UID: "yyy",
 				ValidUntil: time.Unix(123456789, 0),
 				Tokens:     []string{"a", "b", "c"}}},
 	}
@@ -28,8 +28,8 @@ func TestParseTicket(t *testing.T) {
 			msg = ""
 		)
 		switch {
-		case u.Uid != v.Uid:
-			msg = "Uid"
+		case u.UID != v.UID:
+			msg = "UID"
 		case u.ClientIP != v.ClientIP:
 			msg = "ClientIP"
 		case u.ValidUntil != v.ValidUntil:
@@ -74,7 +74,7 @@ j7ndb1DQy5mHeqWskXwL
 */
 
 var (
-	dsa_public_key = `-----BEGIN PUBLIC KEY-----
+	dsaPublicKey = `-----BEGIN PUBLIC KEY-----
 MIIBtzCCASsGByqGSM44BAEwggEeAoGBAPxIF7HmOnHjlOo3C4CSUWOA1TFrrR8a
 yNhYgT95OcsMXlaaQHF6XgjPTFoQjoQ4GmUcQ9qBumq+8WcVydQrf7i36OrnsP/g
 1XBcUkdT76qBAy7srzg3Sb0c2JGEzdcSvW/lGV+ZQJQzq8NE5+ERZbCDF8oOtJCL
@@ -87,20 +87,20 @@ woK/v4IKMwDvmRcw275lvWTlFL3HVK9QVHv8fYXg1oQ/05DI2aDuCmDUp5Jk6ePl
 7B5glZiSoJZYUkM=
 -----END PUBLIC KEY-----
 `
-	text_dsa = `uid=foobar;validuntil=123456789;tokens=;udata=`
-	sig_dsa  = `MCwCFEmMvKWbbIjTCJMbgz1P4N+TWOodAhRRTr9odvBjKtCKaE1B6ysW548oqw==`
-	sig_bad  = `01234567890123456789012345678901234567890123456789012345678912==`
+	textDSA = `uid=foobar;validuntil=123456789;tokens=;udata=`
+	sigDSA  = `MCwCFEmMvKWbbIjTCJMbgz1P4N+TWOodAhRRTr9odvBjKtCKaE1B6ysW548oqw==`
+	sigBad  = `01234567890123456789012345678901234567890123456789012345678912==`
 )
 
 func TestVerify(t *testing.T) {
-	pa := NewPubtktAuthFromPEM([]byte(dsa_public_key))
-	if !pa.verifySig(text_dsa, sig_dsa) {
+	pa := NewPubtktAuthFromPEM([]byte(dsaPublicKey))
+	if !pa.verifySig(textDSA, sigDSA) {
 		t.Errorf("ticket failed verification")
 	}
-	if pa.verifySig(text_dsa+"1", sig_dsa) {
+	if pa.verifySig(textDSA+"1", sigDSA) {
 		t.Errorf("changed ticket passed verification")
 	}
-	if pa.verifySig(text_dsa, sig_bad) {
+	if pa.verifySig(textDSA, sigBad) {
 		t.Errorf("ticket passed with bad signature")
 	}
 }

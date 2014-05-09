@@ -10,6 +10,9 @@ import (
 	"github.com/dbrower/disadis/fedora"
 )
 
+// NewHydraAuth makes a new HydraAuth using the given fedoraPath
+// and object namespace. The namespace is prefixed to any objects identifiers
+// before lookup in Fedora.
 func NewHydraAuth(fedoraPath, namespace string) *HydraAuth {
 	return &HydraAuth{
 		fedora: fedora.NewRemote(fedoraPath, namespace),
@@ -93,13 +96,16 @@ type User struct {
 	Groups []string
 }
 
+// Authorization encodes the possible results from Check().
+// The possible values are the Auth* constants.
 type Authorization int
 
 const (
-	AuthDeny = iota
-	AuthAllow
-	AuthNotFound
-	AuthError
+	// AuthDeny means the given user should not see the given object.
+	AuthDeny Authorization = iota
+	AuthAllow	// the user should see the object
+	AuthNotFound	// the object was not found
+	AuthError	// there was an error doing the verification
 )
 
 // Check determines whether fedora item id is viewable by the given request.
