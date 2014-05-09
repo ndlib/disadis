@@ -2,11 +2,11 @@ package timecache
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 )
 
+// Cache provides a simple interface for caches having string keys.
 type Cache interface {
 	Get(key string) (interface{}, error)
 	Add(key string, value interface{}) error
@@ -16,13 +16,14 @@ type Cache interface {
 type timecache struct {
 	sync.RWMutex               // Protects everything below
 	expires      time.Duration // length of time until items are removed
+
 	// we use data as a circular buffer. head points to first empty
 	// space to store new entries, tail points to oldest non-empty square.
 	// If head == tail the cache is empty. This means we can only
 	// utilize len(data)-1 spaces.
 	head, tail int
 	data       []entry
-	stop       chan<- struct{} // used to stop background sweeper
+	stop       chan<- struct{} // used to stop the background sweeper
 }
 
 type entry struct {
@@ -32,23 +33,22 @@ type entry struct {
 }
 
 var (
-	NotFound = errors.New("Not Found")
+	// ErrNotFound indicates a key was not found in the cache
+	ErrNotFound = errors.New("not found")
 )
 
 // Gets the oldest item in the cache with the given key.
-// returns the NotFound error if nothing is found.
-// Item is guarenteed to not be older than 1.1 * expires.
-// (e.g. if expires is 30 seconds, the item returned will never
-// be older than 33 seconds). This is due to use not checking timestamps
-// in a Get, and the sweeper running on expires/10 intervals.
+// returns the ErrNotFound error if nothing is found.
+// Item is guarenteed to not be older than expires.
 func (tc *timecache) Get(key string) (interface{}, error) {
 	var (
-		v   interface{} = nil
-		err             = NotFound
+		now = time.Now()
+		v   interface{}
+		err = ErrNotFound
 	)
 	tc.RLock()
 	for i := tc.tail; i != tc.head; i = tc.advance(i) {
-		if key == tc.data[i].key {
+		if key == tc.data[i].key && now.Before(tc.data[i].t) {
 			v = tc.data[i].val
 			err = nil
 			break
@@ -59,7 +59,7 @@ func (tc *timecache) Get(key string) (interface{}, error) {
 }
 
 // Add item with key to the cache. Duplicate keys can be added, only the oldest
-// unexpired one is returned for any Gets.
+// unexpired one is returned for any call to Get().
 func (tc *timecache) Add(key string, value interface{}) error {
 	// We will add the key to the end, even if it already exists!
 	now := time.Now()
@@ -77,11 +77,15 @@ func (tc *timecache) Add(key string, value interface{}) error {
 	return nil
 }
 
+// New creates a timecache which can store a maximum of size entires
+// and entries will be deleted after expires time has elapsed.
 func New(size int, expires time.Duration) *timecache {
 	c := make(chan struct{})
+	// add 1 to the size because the way we use head and tail
+	// the maximum capacity of the cache is len(data) - 1
 	tc := &timecache{
 		expires: expires,
-		data:    make([]entry, size),
+		data:    make([]entry, size+1),
 		stop:    c,
 	}
 	// set the sweep period to 1/10 of the timout value
@@ -137,7 +141,6 @@ func (tc *timecache) prune() {
 	tc.Lock()
 	var i = tc.tail
 	for ; i != tc.head; i = tc.advance(i) {
-		fmt.Printf("%d, %v\n", i, tc.data[i].t)
 		if now.Before(tc.data[i].t) {
 			break
 		}
