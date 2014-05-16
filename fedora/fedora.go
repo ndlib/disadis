@@ -32,8 +32,8 @@ type Fedora interface {
 type ContentInfo struct {
 	// These fields are from the headers in the fedora response
 	// They may be empty strings, representing that the value is unknown
-	Type string
-	Length string
+	Type        string
+	Length      string
 	Disposition string
 }
 

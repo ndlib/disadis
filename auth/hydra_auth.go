@@ -17,7 +17,7 @@ import (
 func NewHydraAuth(fedoraPath, namespace string) *HydraAuth {
 	return &HydraAuth{
 		fedora: fedora.NewRemote(fedoraPath, namespace),
-		cache:  timecache.New(100, 30*time.Second),
+		cache:  timecache.New(250, 30*time.Second),
 	}
 }
 
@@ -25,18 +25,18 @@ func NewHydraAuth(fedoraPath, namespace string) *HydraAuth {
 // in some fedora instance. It can either be used as an http.Handler, wrapping
 // a target handler, or independently in your own handler.
 //
-// The RequestUser is used to determine the current user given a request.
+// CurrentUser is used to determine the current user given a request.
 // It may make HTTP calls or perform database lookups to resolve things,
 // ultimately returning a username and a list of groups the user belongs to.
 // The zero value for the User is the anonymous user who belongs to no groups.
 //
-// To use it as a wrapping handler, give it a Handler to wrap and an optional
-// IdExtractor to return an object identifier given a URL. The default extractor
-// takes the first path component in the URL.
-// This interface may need to be generalized to be a
+// Set Handler to use HydraAuth as a wrapping authorization handler.
+// IdExtractor is a function returning an object identifier given a URL.
+// The default extractor takes the first path component in the URL.
+// The IdExtractor type may need to be generalized to be
 //	func(*http.Request) string
 //
-// To just use the checking in your own handler call Check() directly.
+// To use the authorization checking in your own handler call Check() directly.
 type HydraAuth struct {
 	CurrentUser RequestUser // determines the current user
 	// Extract a Fedora object identifier from a URL
@@ -64,12 +64,14 @@ func (ha *HydraAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "401 Unauthorized", http.StatusUnauthorized)
 	case AuthNotFound:
 		http.Error(w, "404 Not Found", http.StatusNotFound)
-	case AuthError:
-		http.Error(w, "500 Server Error", http.StatusInternalServerError)
 	case AuthAllow:
 		if ha.Handler != nil {
 			ha.Handler.ServeHTTP(w, r)
 		}
+	case AuthError:
+		fallthrough
+	default:
+		http.Error(w, "500 Server Error", http.StatusInternalServerError)
 	}
 }
 
@@ -224,7 +226,7 @@ type accessMetadata struct {
 // TODO: add a cache with a timed expiry
 func (ha *HydraAuth) getRights(id string) *hydraRights {
 	v, err := ha.cache.Get(id)
-	if err != nil {
+	if err == nil {
 		result, ok := v.(*hydraRights)
 		if ok {
 			return result
