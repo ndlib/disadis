@@ -9,6 +9,7 @@ package fedora
 
 import (
 	"bytes"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +28,9 @@ type Fedora interface {
 	// Return the contents of the dsname datastream of object id.
 	// You are expected to close it when you are finished.
 	GetDatastream(id, dsname string) (io.ReadCloser, ContentInfo, error)
+	// GetDatastreamInfo returns the metadata Fedora stores about the named
+	// datastream.
+	GetDatastreamInfo(id, dsname string) (DsInfo, error)
 }
 
 type ContentInfo struct {
@@ -82,6 +86,38 @@ func (rf *remoteFedora) GetDatastream(id, dsname string) (io.ReadCloser, Content
 	info.Length = r.Header.Get("Content-Length")
 	info.Disposition = r.Header.Get("Content-Disposition")
 	return r.Body, info, nil
+}
+
+type DsInfo struct {
+	Label     string `xml:'dsLabel'`
+	VersionID string `xml:'dsVersionID'`
+	State     string `xml:'dsState'`
+	Checksum  string `xml:'dsChecksum'`
+}
+
+func (rf *remoteFedora) GetDatastreamInfo(id, dsname string) (DsInfo, error) {
+	// TODO: make this joining smarter wrt not duplicating slashes
+	var path string = rf.hostpath + "objects/" + rf.namespace + id + "/datastreams/" + dsname + "?format=xml"
+	var info DsInfo
+	r, err := http.Get(path)
+	if err != nil {
+		return info, err
+	}
+	if r.StatusCode != 200 {
+		r.Body.Close()
+		switch r.StatusCode {
+		case 404:
+			return info, FedoraNotFound
+		case 401:
+			return info, FedoraNotAuthorized
+		default:
+			return info, fmt.Errorf("Received status %d from fedora", r.StatusCode)
+		}
+	}
+	dec := xml.NewDecoder(r.Body)
+	err = dec.Decode(info)
+	r.Body.Close()
+	return info, err
 }
 
 func newTestFedora() *TestFedora {

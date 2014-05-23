@@ -57,16 +57,18 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	components := strings.SplitN(path, "/", 2)
 
 	var dsname = "content"
-	switch {
-	case len(components) > 2 || len(components) == 0:
-		notFound(w)
-		return
-	case len(components) == 2:
+	switch len(components) {
+	case 1:
+		/* nothing to be done */
+	case 2:
 		if components[1] != "thumbnail" {
 			notFound(w)
 			return
 		}
 		dsname = "thumbnail"
+	default:
+		notFound(w)
+		return
 	}
 
 	content, info, err := dh.fedora.GetDatastream(components[0], dsname)
