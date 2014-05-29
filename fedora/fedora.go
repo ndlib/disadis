@@ -89,10 +89,10 @@ func (rf *remoteFedora) GetDatastream(id, dsname string) (io.ReadCloser, Content
 }
 
 type DsInfo struct {
-	Label     string `xml:'dsLabel'`
-	VersionID string `xml:'dsVersionID'`
-	State     string `xml:'dsState'`
-	Checksum  string `xml:'dsChecksum'`
+	Label     string `xml:"dsLabel"`
+	VersionID string `xml:"dsVersionID"`
+	State     string `xml:"dsState"`
+	Checksum  string `xml:"dsChecksum"`
 }
 
 func (rf *remoteFedora) GetDatastreamInfo(id, dsname string) (DsInfo, error) {
@@ -115,7 +115,7 @@ func (rf *remoteFedora) GetDatastreamInfo(id, dsname string) (DsInfo, error) {
 		}
 	}
 	dec := xml.NewDecoder(r.Body)
-	err = dec.Decode(info)
+	err = dec.Decode(&info)
 	r.Body.Close()
 	return info, err
 }

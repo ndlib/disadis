@@ -8,6 +8,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"code.google.com/p/gcfg"
@@ -61,10 +62,8 @@ func signalHandler(sig <-chan os.Signal, logw Reopener) {
 
 type Config struct {
 	General struct {
-		Port         string
 		Log_filename string
 		Fedora_addr  string
-		Prefix       string
 	}
 	Pubtkt struct {
 		Key_file string
@@ -74,53 +73,58 @@ type Config struct {
 		Cookie   string
 		Database string
 	}
+	Handler map[string]*struct {
+		Port string
+		Auth bool
+		Versioned bool
+		Prefix string
+		Datastream string
+	}
 }
 
 func main() {
 	var (
-		port        string
 		logfilename string
 		logw        Reopener
 		pubtktKey   string
 		fedoraAddr  string
-		prefix      string
 		secret      string
 		database    string
 		cookieName  string
+		configFile  string
 		config      Config
 	)
 
-	flag.StringVar(&port, "port", "8080", "port to listen on")
 	flag.StringVar(&logfilename, "log", "", "name of log file. Defaults to stdout")
 	flag.StringVar(&pubtktKey, "pubtkt-key", "",
 		"filename of PEM encoded public key to use for pubtkt authentication")
 	flag.StringVar(&fedoraAddr, "fedora", "",
 		"url to use for fedora, includes username and password, if needed")
-	flag.StringVar(&prefix, "prefix", "",
-		"prefix for all fedora id strings. Includes the colon, if there is one")
 	flag.StringVar(&secret, "secret", "",
 		"secret to use to verify rails 3 cookies")
 	flag.StringVar(&database, "db", "",
 		"path and credentials to access the user database (mysql). Needed if --secret is given")
 	flag.StringVar(&cookieName, "cookie", "",
 		"name of cookie holding the rails 3 session")
+	flag.StringVar(&configFile, "config", "",
+		"name of config file to use")
 
 	flag.Parse()
 
 	// the config file stuff was grafted onto the command line options
 	// this should be made pretty
-	err := gcfg.ReadFileInto(&config, "settings.ini")
-	if err != nil {
-		log.Println(err)
+	if configFile != "" {
+		err := gcfg.ReadFileInto(&config, configFile)
+		if err != nil {
+			log.Println(err)
+		}
+		logfilename = config.General.Log_filename
+		fedoraAddr = config.General.Fedora_addr
+		pubtktKey = config.Pubtkt.Key_file
+		secret = config.Rails.Secret
+		database = config.Rails.Database
+		cookieName = config.Rails.Cookie
 	}
-	port = config.General.Port
-	logfilename = config.General.Log_filename
-	fedoraAddr = config.General.Fedora_addr
-	prefix = config.General.Prefix
-	pubtktKey = config.Pubtkt.Key_file
-	secret = config.Rails.Secret
-	database = config.Rails.Database
-	cookieName = config.Rails.Cookie
 
 	/* first set up the log file */
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
@@ -138,9 +142,8 @@ func main() {
 		log.Printf("Error: Fedora address must be set. (--fedora <server addr>)")
 		os.Exit(1)
 	}
-	log.Printf("Using prefix '%s'", prefix)
-	fedora := fedora.NewRemote(fedoraAddr, prefix)
-	ha := auth.NewHydraAuth(fedoraAddr, prefix)
+	fedora := fedora.NewRemote(fedoraAddr, "")
+	ha := auth.NewHydraAuth(fedoraAddr, "")
 	switch {
 	case pubtktKey != "":
 		log.Printf("Using pubtkt %s", pubtktKey)
@@ -173,15 +176,37 @@ func main() {
 		log.Printf("Warning: Only Allowing Public Access.")
 	}
 	/* here is where we would add other handlers to reverse proxy, e.g. */
-	ha.Handler = disseminator.NewDownloadHandler(fedora)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s %s", r.Method, r.RequestURI)
-		ha.ServeHTTP(w, r)
-	})
-
-	/* Enter main loop */
-	err = http.ListenAndServe(":"+port, nil)
-	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
+	if len(config.Handler) == 0 {
+		log.Printf("No Handlers are defined. Exiting.")
+		return
 	}
+
+	runHandlers(config, fedora, ha)
+}
+
+// runHandlers starts a handler for each port in its own goroutine
+// and then waits for all of them to quit.
+func runHandlers(config Config, fedora fedora.Fedora, auth *auth.HydraAuth) {
+	var wg sync.WaitGroup
+	for k, v := range config.Handler {
+		h := &disseminator.DownloadHandler{
+			Fedora: fedora,
+			Ds: v.Datastream,
+			Versioned: v.Versioned,
+			Prefix: v.Prefix,
+		}
+		if v.Auth {
+			h.Auth = auth
+		}
+		log.Printf("Handler %s (datastream %s, port %s, auth %v)", k, v.Datastream, v.Port, v.Auth)
+		wg.Add(1)
+		go http.ListenAndServe(":"+v.Port, http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				log.Printf("%s %s", r.Method, r.RequestURI)
+				h.ServeHTTP(w, r)
+			}))
+	}
+	go http.ListenAndServe(":6060", nil)
+	// We add things to the waitgroup, but never take them away. This will never return.
+	wg.Wait()
 }
