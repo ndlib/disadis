@@ -11,17 +11,19 @@ import (
 	"github.com/dbrower/disadis/fedora"
 )
 
-// Handles the route
+// Handles the routes
 //
 //	GET	/:id
+//	HEAD	/:id
 //
-// And, if Versioned is true, the route
+// And, if Versioned is true, the routes
 //
 //	GET	/:id/:version
+//	HEAD	/:id/:version
 //
-// The first route will return current version of the contents of the
+// The first routes will return current version of the contents of the
 // datastream named Ds.
-// The second will either return the current version of the contents of
+// The second group will either return the current version of the contents of
 // Ds, provided the current version is equal to :version. Otherwise,
 // a 403 Error is returned.
 //
@@ -46,9 +48,11 @@ import (
 //
 // Example Usage:
 //	fedora := "http://fedoraAdmin:fedoraAdmin@localhost:8983/fedora/"
-//	ha := NewHydraAuth(fedora, "vecnet:")
-//	ha.Handler = NewDownloadHandler(NewRemoteFedora(fedora, "vecnet:"))
-//	http.Handle("/d/", http.StripPrefix("/d/", ha))
+//	dh = NewDownloadHandler(NewRemoteFedora(fedora, ""))
+//	dh.Ds = "content"
+//	dh.Prefix = "vecnet:"
+//	dh.Auth = NewHydraAuth(fedora, "")
+//	http.Handle("/d/", http.StripPrefix("/d/", dh))
 //	return http.ListenAndServe(":"+port, nil)
 type DownloadHandler struct {
 	Fedora fedora.Fedora
@@ -71,7 +75,7 @@ func notFound(w http.ResponseWriter) {
 func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s %s", r.Method, r.URL.Path)
 
-	if r.Method != "GET" {
+	if r.Method != "GET" && r.Method != "HEAD" {
 		notFound(w)
 		return
 	}
@@ -173,7 +177,11 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private")
 	w.Header().Set("ETag", dsinfo.VersionID)
 
-	io.Copy(w, content)
+	if r.Method == "GET" {
+		io.Copy(w, content)
+	} else {
+		w.WriteHeader(200)
+	}
 	return
 }
 

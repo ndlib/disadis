@@ -222,8 +222,6 @@ type accessMetadata struct {
 }
 
 // given an object identifier, get and decode the rights metadata for it
-//
-// TODO: add a cache with a timed expiry
 func (ha *HydraAuth) getRights(id string) *hydraRights {
 	v, err := ha.cache.Get(id)
 	if err == nil {

@@ -175,7 +175,6 @@ func main() {
 	if ha.CurrentUser == nil {
 		log.Printf("Warning: Only Allowing Public Access.")
 	}
-	/* here is where we would add other handlers to reverse proxy, e.g. */
 	if len(config.Handler) == 0 {
 		log.Printf("No Handlers are defined. Exiting.")
 		return
