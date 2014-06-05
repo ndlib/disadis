@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"code.google.com/p/gcfg"
 	_ "github.com/go-sql-driver/mysql"
@@ -74,10 +75,10 @@ type Config struct {
 		Database string
 	}
 	Handler map[string]*struct {
-		Port string
-		Auth bool
-		Versioned bool
-		Prefix string
+		Port       string
+		Auth       bool
+		Versioned  bool
+		Prefix     string
 		Datastream string
 	}
 }
@@ -189,10 +190,10 @@ func runHandlers(config Config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 	var wg sync.WaitGroup
 	for k, v := range config.Handler {
 		h := &disseminator.DownloadHandler{
-			Fedora: fedora,
-			Ds: v.Datastream,
+			Fedora:    fedora,
+			Ds:        v.Datastream,
 			Versioned: v.Versioned,
-			Prefix: v.Prefix,
+			Prefix:    v.Prefix,
 		}
 		if v.Auth {
 			h.Auth = auth
@@ -201,8 +202,9 @@ func runHandlers(config Config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 		wg.Add(1)
 		go http.ListenAndServe(":"+v.Port, http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				log.Printf("%s %s", r.Method, r.RequestURI)
+				t := time.Now()
 				h.ServeHTTP(w, r)
+				log.Printf("%s %s %s %v", r.RemoteAddr, r.Method, r.RequestURI, time.Now().Sub(t))
 			}))
 	}
 	go http.ListenAndServe(":6060", nil)

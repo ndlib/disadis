@@ -4,8 +4,8 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
 	"strconv"
+	"strings"
 
 	"github.com/dbrower/disadis/auth"
 	"github.com/dbrower/disadis/fedora"
@@ -55,11 +55,11 @@ import (
 //	http.Handle("/d/", http.StripPrefix("/d/", dh))
 //	return http.ListenAndServe(":"+port, nil)
 type DownloadHandler struct {
-	Fedora fedora.Fedora
-	Ds string
+	Fedora    fedora.Fedora
+	Ds        string
 	Versioned bool
-	Prefix string
-	Auth *auth.HydraAuth
+	Prefix    string
+	Auth      *auth.HydraAuth
 }
 
 func NewDownloadHandler(f fedora.Fedora) http.Handler {
@@ -73,8 +73,6 @@ func notFound(w http.ResponseWriter) {
 }
 
 func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Printf("%s %s", r.Method, r.URL.Path)
-
 	if r.Method != "GET" && r.Method != "HEAD" {
 		notFound(w)
 		return
@@ -86,9 +84,9 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	components := strings.SplitN(path, "/", 2)
 
 	var (
-		pid = dh.Prefix + components[0]	// sanitize pid somehow?
-		version int = -1	// -1 == current version
-		err error
+		pid         = dh.Prefix + components[0] // sanitize pid somehow?
+		version int = -1                        // -1 == current version
+		err     error
 	)
 	// auth?
 	if dh.Auth != nil {
@@ -136,7 +134,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// does the version requested match the current version number?
-	if version >= 0 && version != dh.currentVersion(dsinfo) {
+	if version >= 0 && version != dsinfo.Version() {
 		http.Error(w, "403 Forbidden", http.StatusForbidden)
 		return
 	}
@@ -168,11 +166,12 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer content.Close()
 
-	// sometimes fedora appends an extra extension. see FCREPO-497 in the
-	// fedora commons JIRA.
+	// sometimes fedora appends an extra extension. See FCREPO-497 in the
+	// fedora commons JIRA. This is why we pull the filename directly from
+	// the datastream label.
 	w.Header().Set("Content-Type", info.Type)
 	w.Header().Set("Content-Length", info.Length)
-	w.Header().Set("Content-Disposition", `inline; filename="` + dsinfo.Label + `"`)
+	w.Header().Set("Content-Disposition", `inline; filename="`+dsinfo.Label+`"`)
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	w.Header().Set("Cache-Control", "private")
 	w.Header().Set("ETag", dsinfo.VersionID)
@@ -183,20 +182,4 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	}
 	return
-}
-
-// returns -1 on error
-func (dh *DownloadHandler) currentVersion(info fedora.DsInfo) int {
-	// VersionID has the form "something.X"
-	i := strings.LastIndex(info.VersionID, ".")
-	if i == -1 {
-		log.Println("Error parsing", info.VersionID)
-		return -1
-	}
-	version, err := strconv.Atoi(info.VersionID[i+1:])
-	if err != nil {
-		log.Println(err)
-		return -1
-	}
-	return version
 }

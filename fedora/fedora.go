@@ -15,6 +15,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 var (
@@ -118,6 +120,24 @@ func (rf *remoteFedora) GetDatastreamInfo(id, dsname string) (DsInfo, error) {
 	err = dec.Decode(&info)
 	r.Body.Close()
 	return info, err
+}
+
+// Version returns the version number as an integer.
+// For example, if VersionID is "content.2" Version() will
+// return 2. It returns -1 on error.
+func (info DsInfo) Version() int {
+	// VersionID has the form "something.X"
+	i := strings.LastIndex(info.VersionID, ".")
+	if i == -1 {
+		//log.Println("Error parsing", info.VersionID)
+		return -1
+	}
+	version, err := strconv.Atoi(info.VersionID[i+1:])
+	if err != nil {
+		//log.Println(err)
+		return -1
+	}
+	return version
 }
 
 func newTestFedora() *TestFedora {
