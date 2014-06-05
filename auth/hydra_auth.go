@@ -17,7 +17,7 @@ import (
 func NewHydraAuth(fedoraPath, namespace string) *HydraAuth {
 	return &HydraAuth{
 		fedora: fedora.NewRemote(fedoraPath, namespace),
-		cache:  timecache.New(250, 30*time.Second),
+		cache:  timecache.New(250, 5*time.Minute),
 	}
 }
 
@@ -120,19 +120,19 @@ const (
 // instead of
 //	ab12cd34
 func (ha *HydraAuth) Check(r *http.Request, id string) Authorization {
-	log.Printf("Checking rights for %s", id)
 	rights := ha.getRights(id)
 	if rights == nil {
-		log.Printf("Not Found %s", id)
+		log.Printf("Rights Not Found %s", id)
 		return AuthNotFound
 	}
 	var u User // zero is the anon user
 	// first try with the anon user to see if item is viewable by the public.
 	if rights.canView(u) == AuthAllow {
-		log.Printf("Is Public: %s", id)
+		log.Printf("Is Public %s", id)
 		return AuthAllow
 	}
-	// now we need to decode the current user
+	// now we need to decode the current user. Bail if there is no
+	// way to get the current user info.
 	if ha.CurrentUser == nil {
 		return AuthDeny
 	}
@@ -232,7 +232,7 @@ func (ha *HydraAuth) getRights(id string) *hydraRights {
 	}
 	r, _, err := ha.fedora.GetDatastream(id, "rightsMetadata")
 	if err != nil {
-		log.Println(err)
+		log.Printf("Received Fedora error (%s): %s", id, err.Error())
 		return nil
 	}
 	defer r.Close()
@@ -241,7 +241,7 @@ func (ha *HydraAuth) getRights(id string) *hydraRights {
 	d := xml.NewDecoder(r)
 	err = d.Decode(&rights)
 	if err != nil {
-		log.Printf("Decode error %s", err.Error())
+		log.Println("Error decoding rightsMetadata (%s):", id, err)
 		return nil
 	}
 
@@ -262,7 +262,10 @@ func (ha *HydraAuth) getRights(id string) *hydraRights {
 	if rights.Embargo != "" {
 		t, err := time.Parse("2006-01-02", rights.Embargo)
 		if err != nil {
-			log.Printf("Error decoding %s: %v", rights.Embargo, err)
+			log.Printf("Error decoding embargo (%s) '%s': %v",
+				id,
+				rights.Embargo,
+				err)
 		}
 		result.embargo = t
 	}

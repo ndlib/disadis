@@ -128,7 +128,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	dsinfo, err := dh.Fedora.GetDatastreamInfo(pid, dh.Ds)
 	if err != nil {
-		log.Println(err)
+		log.Println("Received Fedora error:", err)
 		notFound(w)
 		return
 	}
@@ -159,7 +159,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			notFound(w)
 			return
 		default:
-			log.Printf("Got fedora error: %s", err)
+			log.Println("Received fedora error:", err)
 			http.Error(w, "500 Internal Error", http.StatusInternalServerError)
 			return
 		}

@@ -184,7 +184,7 @@ func main() {
 	runHandlers(config, fedora, ha)
 }
 
-// runHandlers starts a handler for each port in its own goroutine
+// runHandlers starts a listener for each port in its own goroutine
 // and then waits for all of them to quit.
 func runHandlers(config Config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 	var wg sync.WaitGroup
@@ -200,14 +200,22 @@ func runHandlers(config Config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 		}
 		log.Printf("Handler %s (datastream %s, port %s, auth %v)", k, v.Datastream, v.Port, v.Auth)
 		wg.Add(1)
+		k := k // make copy for inside of func
+		// see http://golang.org/doc/faq#closures_and_goroutines
 		go http.ListenAndServe(":"+v.Port, http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				t := time.Now()
 				h.ServeHTTP(w, r)
-				log.Printf("%s %s %s %v", r.RemoteAddr, r.Method, r.RequestURI, time.Now().Sub(t))
+				log.Printf("%s %s %s %s %v",
+					k,
+					r.RemoteAddr,
+					r.Method,
+					r.RequestURI,
+					time.Now().Sub(t))
 			}))
 	}
+	// Listen on 6060 to get pprof output
 	go http.ListenAndServe(":6060", nil)
-	// We add things to the waitgroup, but never take them away. This will never return.
+	// We add things to the waitgroup, but never call wg.Done(). This will never return.
 	wg.Wait()
 }
