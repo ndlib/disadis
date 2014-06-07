@@ -1,4 +1,4 @@
-package disseminator
+package main
 
 import (
 	"io"

@@ -16,7 +16,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/dbrower/disadis/auth"
-	"github.com/dbrower/disadis/disseminator"
 	"github.com/dbrower/disadis/fedora"
 )
 
@@ -189,7 +188,7 @@ func main() {
 func runHandlers(config Config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 	var wg sync.WaitGroup
 	for k, v := range config.Handler {
-		h := &disseminator.DownloadHandler{
+		h := &DownloadHandler{
 			Fedora:    fedora,
 			Ds:        v.Datastream,
 			Versioned: v.Versioned,
