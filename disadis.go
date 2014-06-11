@@ -74,11 +74,12 @@ type Config struct {
 		Database string
 	}
 	Handler map[string]*struct {
-		Port       string
-		Auth       bool
-		Versioned  bool
-		Prefix     string
-		Datastream string
+		Port          string
+		Auth          bool
+		Versioned     bool
+		Prefix        string
+		Datastream    string
+		Datastream_id []string
 	}
 }
 
@@ -183,10 +184,17 @@ func main() {
 	runHandlers(config, fedora, ha)
 }
 
+type handlerBootstrap struct {
+	h    http.Handler
+	name string
+}
+
 // runHandlers starts a listener for each port in its own goroutine
 // and then waits for all of them to quit.
 func runHandlers(config Config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 	var wg sync.WaitGroup
+	portHandlers := make(map[string]*DsidMux)
+	// first create the handlers
 	for k, v := range config.Handler {
 		h := &DownloadHandler{
 			Fedora:    fedora,
@@ -197,11 +205,20 @@ func runHandlers(config Config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 		if v.Auth {
 			h.Auth = auth
 		}
-		log.Printf("Handler %s (datastream %s, port %s, auth %v)", k, v.Datastream, v.Port, v.Auth)
-		wg.Add(1)
-		k := k // make copy for inside of func
+		log.Printf("Handler %s (datastream %s, port %s, auth %v, dsid %v)",
+			k,
+			v.Datastream,
+			v.Port,
+			v.Auth,
+			v.Datastream_id)
+		mux, ok := portHandlers[v.Port]
+		if !ok {
+			mux = &DsidMux{}
+			portHandlers[v.Port] = mux
+		}
 		// see http://golang.org/doc/faq#closures_and_goroutines
-		go http.ListenAndServe(":"+v.Port, http.HandlerFunc(
+		k := k // make local ref to var for closure
+		hh := http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				t := time.Now()
 				h.ServeHTTP(w, r)
@@ -211,7 +228,22 @@ func runHandlers(config Config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 					r.Method,
 					r.RequestURI,
 					time.Now().Sub(t))
-			}))
+			})
+		if len(v.Datastream_id) == 0 {
+			mux.DefaultHandler = hh
+		}
+		for _, name := range v.Datastream_id {
+			if name == "default" {
+				mux.DefaultHandler = hh
+			} else {
+				mux.AddHandler(name, hh)
+			}
+		}
+	}
+	// now start a goroutine for each port
+	for port, h := range portHandlers {
+		wg.Add(1)
+		go http.ListenAndServe(":"+port, h)
 	}
 	// Listen on 6060 to get pprof output
 	go http.ListenAndServe(":6060", nil)

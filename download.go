@@ -11,7 +11,7 @@ import (
 	"github.com/dbrower/disadis/fedora"
 )
 
-// Handles the routes
+// DownloadHandler handles the routes
 //
 //	GET	/:id
 //	HEAD	/:id
@@ -128,7 +128,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	dsinfo, err := dh.Fedora.GetDatastreamInfo(pid, dh.Ds)
 	if err != nil {
-		log.Println("Received Fedora error:", err)
+		log.Printf("Received Fedora error (%s,%s): %s", pid, dh.Ds, err.Error())
 		notFound(w)
 		return
 	}
