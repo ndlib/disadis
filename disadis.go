@@ -221,10 +221,14 @@ func runHandlers(config Config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 		hh := http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				t := time.Now()
+				realip := r.Header.Get("X-Real-IP")
+				if realip == "" {
+					realip = r.RemoteAddr
+				}
 				h.ServeHTTP(w, r)
 				log.Printf("%s %s %s %s %v",
 					k,
-					r.RemoteAddr,
+					realip,
 					r.Method,
 					r.RequestURI,
 					time.Now().Sub(t))
