@@ -140,11 +140,12 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// e-tag match?
+	targetEtag := `"` + dsinfo.VersionID + `"`
 	etags, ok := r.Header["If-None-Match"]
 	if ok {
 		for i := range etags {
-			if etags[i] == dsinfo.VersionID {
-				w.Header().Set("ETag", dsinfo.VersionID)
+			if etags[i] == targetEtag {
+				w.Header().Set("ETag", targetEtag)
 				w.WriteHeader(http.StatusNotModified)
 				return
 			}
@@ -174,7 +175,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", `inline; filename="`+dsinfo.Label+`"`)
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	w.Header().Set("Cache-Control", "private")
-	w.Header().Set("ETag", dsinfo.VersionID)
+	w.Header().Set("ETag", targetEtag)
 
 	if r.Method == "GET" {
 		io.Copy(w, content)
