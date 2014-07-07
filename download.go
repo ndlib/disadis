@@ -45,6 +45,8 @@ import (
 //
 // Note that because the identifier is pulled from the URL, identifiers
 // containing forward slashes are problematic and are not handled.
+// Also, identifiers shorter than 1 or longer than 64 characters are rejected.
+// (If this is a problem for you, the limit can be changed).
 //
 // Example Usage:
 //	fedora := "http://fedoraAdmin:fedoraAdmin@localhost:8983/fedora/"
@@ -79,9 +81,18 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// "" / "id" ( / :version )?
+	// :version may contain slashes, if there are more slashes in the url.
+	// this way we can verify IIIF requests (which have lots of slashes) easily
 	path := strings.TrimPrefix(r.URL.Path, "/")
 	path = strings.TrimSuffix(path, "/")
+	// will always return a string of length 1 or 2
 	components := strings.SplitN(path, "/", 2)
+
+	// will an identifier ever have more than 64 characters?
+	if len(components[0]) == 0 || len(components[0]) > 64 {
+		notFound(w)
+		return
+	}
 
 	var (
 		pid         = dh.Prefix + components[0] // sanitize pid somehow?
@@ -108,22 +119,12 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// figure out versions
-	switch len(components) {
-	case 1:
-		// match /:id
-		/* nothing to be done */
-	case 2:
-		// match /:id/:version
-		if dh.Versioned {
-			version, err = strconv.Atoi(components[1])
-			if err == nil && version >= 0 {
-				break
-			}
+	if len(components) == 2 && dh.Versioned {
+		version, err = strconv.Atoi(components[1])
+		if err != nil || version < 0 {
+			notFound(w)
+			return
 		}
-		fallthrough
-	default:
-		notFound(w)
-		return
 	}
 
 	dsinfo, err := dh.Fedora.GetDatastreamInfo(pid, dh.Ds)
