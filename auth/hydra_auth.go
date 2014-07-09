@@ -4,7 +4,6 @@ import (
 	"encoding/xml"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/dbrower/disadis/fedora"
@@ -22,69 +21,23 @@ func NewHydraAuth(fedoraPath, namespace string) *HydraAuth {
 }
 
 // HydraAuth will validate requests against Hydra rights metadata stored
-// in some fedora instance. It can either be used as an http.Handler, wrapping
-// a target handler, or independently in your own handler.
+// in some fedora instance. It is intended to be called from your own
+// http.Handler. Check() is safe to be called concurrently my many goroutines.
 //
 // CurrentUser is used to determine the current user given a request.
 // It may make HTTP calls or perform database lookups to resolve things,
 // ultimately returning a username and a list of groups the user belongs to.
-// The zero value for the User is the anonymous user who belongs to no groups.
+// The zero value for the User type is the anonymous user who belongs to no groups.
 //
-// Set Handler to use HydraAuth as a wrapping authorization handler.
-// IdExtractor is a function returning an object identifier given a URL.
-// The default extractor takes the first path component in the URL.
-// The IdExtractor type may need to be generalized to be
-//	func(*http.Request) string
+// Admin is a list of strings giving people and groups who should have admin
+// privileges, which means they may view any object whatsoever.
 //
 // To use the authorization checking in your own handler call Check() directly.
 type HydraAuth struct {
-	CurrentUser RequestUser // determines the current user
-	// Extract a Fedora object identifier from a URL
-	// If nil then the first component in the path is taken to be the identifier
-	IdExtractor func(string) string
-	Handler     http.Handler    // handler to pass authorized requests to
+	CurrentUser RequestUser     // determines the current user
+	Admin       []string        // Admin users and groups
 	fedora      fedora.Fedora   // interface to Fedora
 	cache       timecache.Cache // Cache decoded object rights
-}
-
-func (ha *HydraAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if ha.Handler == nil {
-		http.Error(w, "404 Not found", http.StatusNotFound)
-		return
-	}
-	var id string
-	if ha.IdExtractor == nil {
-		ha.IdExtractor = FirstPathElement
-	}
-	id = ha.IdExtractor(r.URL.Path)
-	// TODO: scan id to ensure it is not malicious
-	switch ha.Check(r, id) {
-	case AuthDeny:
-		// TODO: add WWW-Authenticate header field
-		http.Error(w, "401 Unauthorized", http.StatusUnauthorized)
-	case AuthNotFound:
-		http.Error(w, "404 Not Found", http.StatusNotFound)
-	case AuthAllow:
-		if ha.Handler != nil {
-			ha.Handler.ServeHTTP(w, r)
-		}
-	case AuthError:
-		fallthrough
-	default:
-		http.Error(w, "500 Server Error", http.StatusInternalServerError)
-	}
-}
-
-// FirstPathElement returns the first path component, minus
-// any leading or trailing slashes.
-func FirstPathElement(s string) string {
-	id := strings.TrimPrefix(s, "/")
-	// extract up to either the first "/" or the end of the string
-	j := strings.Index(id, "/")
-	if j != -1 {
-		id = id[0:j]
-	}
-	return id
 }
 
 // A RequestUser returns the current user for a request
@@ -138,6 +91,11 @@ func (ha *HydraAuth) Check(r *http.Request, id string) Authorization {
 	}
 	u = ha.CurrentUser.User(r)
 	log.Printf("Found user '%s', %#v", u.Id, u.Groups)
+	// is admin user?
+	if member(u.Id, ha.Admin) || incommon(u.Groups, ha.Admin) {
+		log.Printf("user %s is admin", u.Id)
+		return AuthAllow
+	}
 	return rights.canView(u)
 }
 
@@ -150,22 +108,6 @@ type hydraRights struct {
 	editPeople []string
 	embargo    time.Time
 	version    string
-}
-
-// Does this hydraRights allow public viewing?
-// Duplicates some of the canView logic to try to prevent decoding the user
-// when the decoding isn't needed.
-func (hr *hydraRights) isPublic() bool {
-	if hr.version != "0.1" {
-		return false
-	}
-	if time.Now().Before(hr.embargo) {
-		return false
-	}
-	if member("public", hr.readGroups) || member("public", hr.editGroups) {
-		return true
-	}
-	return false
 }
 
 // Compare an items access rights against a User to see if view access should be

@@ -12,6 +12,9 @@ func member(a string, list []string) bool {
 
 // do lists 'a' and 'b' contain a member in common?
 func incommon(a, b []string) bool {
+	if len(b) == 0 {
+		return false
+	}
 	for i := range a {
 		if member(a[i], b) {
 			return true

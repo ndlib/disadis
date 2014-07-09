@@ -64,6 +64,7 @@ type Config struct {
 	General struct {
 		Log_filename string
 		Fedora_addr  string
+		Admin        []string
 	}
 	Pubtkt struct {
 		Key_file string
@@ -145,6 +146,8 @@ func main() {
 	}
 	fedora := fedora.NewRemote(fedoraAddr, "")
 	ha := auth.NewHydraAuth(fedoraAddr, "")
+	ha.Admin = config.General.Admin
+	log.Println("Admin users:", ha.Admin)
 	switch {
 	case pubtktKey != "":
 		log.Printf("Using pubtkt %s", pubtktKey)
