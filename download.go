@@ -1,11 +1,11 @@
 package main
 
 import (
-	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dbrower/disadis/auth"
 	"github.com/dbrower/disadis/fedora"
@@ -141,6 +141,8 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// e-tag match?
+	// XXX: remove this logic? it is subsumed in ServeContent, but then we will always be hitting fedora...
+	// need to time it
 	targetEtag := `"` + dsinfo.VersionID + `"`
 	etags, ok := r.Header["If-None-Match"]
 	if ok {
@@ -154,6 +156,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// return content
+	// Wrap in a conditional, so we do not ask fedora for something we don't need
 	content, info, err := dh.Fedora.GetDatastream(pid, dh.Ds)
 	if err != nil {
 		switch err {
@@ -178,10 +181,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private")
 	w.Header().Set("ETag", targetEtag)
 
-	if r.Method == "GET" {
-		io.Copy(w, content)
-	} else {
-		w.WriteHeader(200)
-	}
+	n, _ := strconv.Atoi(info.Length)
+	http.ServeContent(w, r, dsinfo.Label, time.Time{}, NewStreamSeeker(content, int64(n)))
 	return
 }
