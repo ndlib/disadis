@@ -64,12 +64,6 @@ type DownloadHandler struct {
 	Auth      *auth.HydraAuth
 }
 
-func NewDownloadHandler(f fedora.Fedora) http.Handler {
-	return &DownloadHandler{
-		Fedora: f,
-	}
-}
-
 func notFound(w http.ResponseWriter) {
 	http.Error(w, "404 Not Found", http.StatusNotFound)
 }
@@ -97,7 +91,6 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var (
 		pid         = dh.Prefix + components[0] // sanitize pid somehow?
 		version int = -1                        // -1 == current version
-		err     error
 	)
 	// auth?
 	if dh.Auth != nil {
@@ -120,6 +113,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// figure out versions
 	if len(components) == 2 && dh.Versioned {
+		var err error
 		version, err = strconv.Atoi(components[1])
 		if err != nil || version < 0 {
 			notFound(w)
@@ -127,6 +121,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// always hit fedora for most recent version
 	dsinfo, err := dh.Fedora.GetDatastreamInfo(pid, dh.Ds)
 	if err != nil {
 		log.Printf("Received Fedora error (%s,%s): %s", pid, dh.Ds, err.Error())
@@ -141,8 +136,9 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// e-tag match?
-	// XXX: remove this logic? it is subsumed in ServeContent, but then we will always be hitting fedora...
-	// need to time it
+	// We keep this logic here even though ServeContent will also check the
+	// E-Tag header since if it matches, we won't need to hit fedora a second
+	// time for the ds content.
 	targetEtag := `"` + dsinfo.VersionID + `"`
 	etags, ok := r.Header["If-None-Match"]
 	if ok {
@@ -156,7 +152,6 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// return content
-	// Wrap in a conditional, so we do not ask fedora for something we don't need
 	content, info, err := dh.Fedora.GetDatastream(pid, dh.Ds)
 	if err != nil {
 		switch err {
@@ -181,7 +176,10 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private")
 	w.Header().Set("ETag", targetEtag)
 
-	n, _ := strconv.Atoi(info.Length)
-	http.ServeContent(w, r, dsinfo.Label, time.Time{}, NewStreamSeeker(content, int64(n)))
+	// use ServeContent and the StreamSeeker to handle range requests.
+	// when/if fedora ever supports range requests, this should be changed to
+	// pass the range through
+	n, _ := strconv.ParseInt(info.Length, 10, 64)
+	http.ServeContent(w, r, dsinfo.Label, time.Time{}, NewStreamSeeker(content, n))
 	return
 }
