@@ -17,13 +17,13 @@ type timecache struct {
 	sync.RWMutex               // Protects everything below
 	expires      time.Duration // length of time until items are removed
 
-	// we use data as a circular buffer. head points to first empty
+	// `data` is a circular buffer. head points to first empty
 	// space to store new entries, tail points to oldest non-empty square.
-	// If head == tail the cache is empty. This means we can only
+	// head == tail iff the cache is empty. This means we can only
 	// utilize len(data)-1 spaces.
 	head, tail int
 	data       []entry
-	stop       chan<- struct{} // used to stop the background sweeper
+	stop       chan<- struct{} // stop the background sweeper
 }
 
 type entry struct {
@@ -88,13 +88,7 @@ func New(size int, expires time.Duration) *timecache {
 		data:    make([]entry, size+1),
 		stop:    c,
 	}
-	// set the sweep period to 1/10 of the timout value
-	// but no faster than every 30ms
-	var period = expires / (10 * time.Nanosecond)
-	if period < 30*time.Millisecond {
-		period = 30 * time.Millisecond
-	}
-	go tc.backgroundCleaner(time.Second, c)
+	go tc.backgroundCleaner(c)
 	return tc
 }
 
@@ -106,22 +100,29 @@ func (tc *timecache) advance(i int) int {
 	return i
 }
 
-func (tc *timecache) backgroundCleaner(period time.Duration, stop <-chan struct{}) {
-	ticker := time.NewTicker(period)
+func (tc *timecache) backgroundCleaner(stop <-chan struct{}) {
+	var nextTime time.Time
 Outer:
 	for {
+		var timeout time.Duration = 5 * time.Minute
+		if (!nextTime.IsZero()) && nextTime.Before(time.Now()) {
+			timeout = nextTime.Sub(time.Now())
+		}
 		select {
 		case <-stop:
 			break Outer
-		case <-ticker.C:
-			tc.prune()
+		case <-time.After(timeout):
+			nextTime = tc.prune()
 		}
 	}
-	ticker.Stop()
 }
 
-func (tc *timecache) prune() {
-	var needPrune bool
+// prune expired entries from cache.
+// returns the expiry time of the oldest entry remaining in cache.
+// If the cache is empty, returns the 0 time.
+// It is possible a non-zero time may be returned if the cache is empty.
+func (tc *timecache) prune() time.Time {
+	var oldestTime time.Time
 	var now = time.Now()
 
 	// First lock in read only mode to see if anything needs pruning.
@@ -130,21 +131,25 @@ func (tc *timecache) prune() {
 	if tc.head == tc.tail {
 		// cache is empty
 		tc.RUnlock()
-		return
+		return oldestTime
 	}
 	// we only need to peek at the tail
-	needPrune = now.After(tc.data[tc.tail].t)
+	oldestTime = tc.data[tc.tail].t
 	tc.RUnlock()
-	if !needPrune {
-		return
+	if now.Before(oldestTime) {
+		return oldestTime
 	}
 	tc.Lock()
 	var i = tc.tail
 	for ; i != tc.head; i = tc.advance(i) {
-		if now.Before(tc.data[i].t) {
+		oldestTime = tc.data[i].t
+		if now.Before(oldestTime) {
 			break
 		}
 	}
 	tc.tail = i
 	tc.Unlock()
+	// if we removed all the items from cache, then oldestTime will be
+	// in error since it will not be zero. We are okay with that.
+	return oldestTime
 }
