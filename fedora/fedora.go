@@ -81,7 +81,7 @@ func (rf *remoteFedora) GetDatastream(id, dsname string) (io.ReadCloser, Content
 		case 401:
 			return nil, info, FedoraNotAuthorized
 		default:
-			return nil, info, fmt.Errorf("Got status %d from fedora", r.StatusCode)
+			return nil, info, fmt.Errorf("Received status %d from fedora", r.StatusCode)
 		}
 	}
 	info.Type = r.Header.Get("Content-Type")
@@ -140,7 +140,7 @@ func (info DsInfo) Version() int {
 	return version
 }
 
-func newTestFedora() *TestFedora {
+func NewTestFedora() *TestFedora {
 	return &TestFedora{data: make(map[string][]byte)}
 }
 
@@ -151,13 +151,30 @@ type TestFedora struct {
 	data map[string][]byte
 }
 
-func (tf *TestFedora) GetDatastream(id, dsname string) (io.ReadCloser, error) {
+func (tf *TestFedora) GetDatastream(id, dsname string) (io.ReadCloser, ContentInfo, error) {
+	ci := ContentInfo{}
 	key := id + "/" + dsname
 	v, ok := tf.data[key]
 	if !ok {
-		return nil, fmt.Errorf("No such element %s", key)
+		return nil, ci, fmt.Errorf("No such element %s", key)
 	}
-	return ioutil.NopCloser(bytes.NewReader(v)), nil
+	ci.Type = "text/plain"
+	ci.Length = fmt.Sprintf("%d", len(v))
+	return ioutil.NopCloser(bytes.NewReader(v)), ci, nil
+}
+
+func (tf *TestFedora) GetDatastreamInfo(id, dsname string) (DsInfo, error) {
+	key := id + "/" + dsname
+	_, ok := tf.data[key]
+	if !ok {
+		return DsInfo{}, fmt.Errorf("No such element %s", key)
+	}
+	return DsInfo{
+		Label:     "",
+		VersionID: dsname + ".0",
+		State:     "A",
+		Checksum:  "",
+	}, nil
 }
 
 func (tf *TestFedora) Set(id, dsname string, value []byte) {
