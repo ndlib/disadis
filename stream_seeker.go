@@ -19,6 +19,8 @@ var (
 	whenceError = errors.New("StreamSeeker.Seek: invalid whence")
 )
 
+// Returns a StreamSeeker wrapping s, and allowing a maximum size of size.
+// size does not need to set, but it does to allow for seeks relative to the end.
 func NewStreamSeeker(s io.Reader, size int64) *StreamSeeker {
 	return &StreamSeeker{
 		s:    s,
