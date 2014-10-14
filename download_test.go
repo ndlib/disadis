@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dbrower/disadis/fedora"
+	"github.com/ndlib/disadis/fedora"
 )
 
 func TestDownload(t *testing.T) {

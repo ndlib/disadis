@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dbrower/disadis/fedora"
-	"github.com/dbrower/disadis/timecache"
+	"github.com/ndlib/disadis/fedora"
+	"github.com/ndlib/disadis/timecache"
 )
 
 // NewHydraAuth makes a new HydraAuth using the given fedoraPath

@@ -15,8 +15,8 @@ import (
 	"code.google.com/p/gcfg"
 	_ "github.com/go-sql-driver/mysql"
 
-	"github.com/dbrower/disadis/auth"
-	"github.com/dbrower/disadis/fedora"
+	"github.com/ndlib/disadis/auth"
+	"github.com/ndlib/disadis/fedora"
 )
 
 type Reopener interface {

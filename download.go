@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dbrower/disadis/auth"
-	"github.com/dbrower/disadis/fedora"
+	"github.com/ndlib/disadis/auth"
+	"github.com/ndlib/disadis/fedora"
 )
 
 // DownloadHandler handles the routes

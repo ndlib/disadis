@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dbrower/disadis/timecache"
+	"github.com/ndlib/disadis/timecache"
 )
 
 // TODO: add better logging to help track down ticket errors?
