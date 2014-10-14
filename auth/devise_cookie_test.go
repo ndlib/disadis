@@ -10,7 +10,7 @@ import (
 	//_ "github.com/mattn/go-sqlite3"
 
 	// yet this sqlite library has the tests passing
-	_ "code.google.com/p/go-sqlite/go1/sqlite3"
+	_ "github.com/mxk/go-sqlite/sqlite3"
 )
 
 func TestDevise(t *testing.T) {
