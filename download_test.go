@@ -10,16 +10,7 @@ import (
 )
 
 func TestDownload(t *testing.T) {
-	tFedora := fedora.NewTestFedora()
-	tFedora.Set("test:0123", "content", []byte("hello"))
-	tFedora.Set("test:123", "content", []byte("goodbye"))
-	h := &DownloadHandler{
-		Fedora:    tFedora,
-		Ds:        "content",
-		Versioned: true,
-		Prefix:    "test:",
-	}
-	ts := httptest.NewServer(h)
+	ts := setupHandler()
 	defer ts.Close()
 
 	var sequence = []struct {
@@ -42,6 +33,14 @@ func TestDownload(t *testing.T) {
 
 		{"GET", "/0123?datastream_id=content", 200, "hello"},
 		{"POST", "/0123", 404, ""},
+
+		// It applies the correct prefix
+		{"GET", "/xyz", 404, ""},
+		{"HEAD", "/xyz", 404, ""},
+		{"GET", "/xyz/0", 404, ""},
+		{"GET", "/xyz/1", 404, ""},
+		{"HEAD", "/xyz/0", 404, ""},
+
 		// identifiers are assumed to not have more than 64 characters
 		{"GET", "/1234567890123456789012345678901234567890123456789012345", 404, ""},
 	}
@@ -49,11 +48,17 @@ func TestDownload(t *testing.T) {
 		checkRoute(t, s.verb, ts.URL+s.route, s.status, s.expected)
 	}
 }
-
 func checkRoute(t *testing.T, verb, route string, status int, expected string) {
+	checkRouteX(t, verb, route, status, expected, nil)
+}
+
+func checkRouteX(t *testing.T, verb, route string, status int, expected string, setup func(*http.Request)) (*http.Response, []byte) {
 	req, err := http.NewRequest(verb, route, nil)
 	if err != nil {
 		t.Fatal("Problem creating request", err)
+	}
+	if setup != nil {
+		setup(req)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -65,11 +70,11 @@ func checkRoute(t *testing.T, verb, route string, status int, expected string) {
 			status,
 			resp.StatusCode)
 	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(route, err)
+	}
 	if expected != "" {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatal(route, err)
-		}
 		if string(body) != expected {
 			t.Errorf("%s: Expected body %s, got %v",
 				route,
@@ -78,4 +83,35 @@ func checkRoute(t *testing.T, verb, route string, status int, expected string) {
 		}
 	}
 	resp.Body.Close()
+	return resp, body
+}
+
+func TestRangeRequest(t *testing.T) {
+	ts := setupHandler()
+	defer ts.Close()
+
+	checkRouteX(t, "GET", ts.URL+"/abc", 206, "longer", func(req *http.Request) {
+		req.Header.Add("Range", "bytes=2-7")
+	})
+	checkRouteX(t, "GET", ts.URL+"/abc", 206, "longer string", func(req *http.Request) {
+		req.Header.Add("Range", "bytes=2-")
+	})
+	checkRouteX(t, "GET", ts.URL+"/abc", 206, "", func(req *http.Request) {
+		req.Header.Add("Range", "bytes=2-7,10-")
+	})
+}
+
+func setupHandler() *httptest.Server {
+	tFedora := fedora.NewTestFedora()
+	tFedora.Set("test:0123", "content", []byte("hello"))
+	tFedora.Set("test:123", "content", []byte("goodbye"))
+	tFedora.Set("test:abc", "content", []byte("a longer string"))
+	tFedora.Set("another:xyz", "content", []byte("hola"))
+	h := &DownloadHandler{
+		Fedora:    tFedora,
+		Ds:        "content",
+		Versioned: true,
+		Prefix:    "test:",
+	}
+	return httptest.NewServer(h)
 }
