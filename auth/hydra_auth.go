@@ -183,7 +183,7 @@ func (ha *HydraAuth) getRights(id string) *hydraRights {
 	d := xml.NewDecoder(r)
 	err = d.Decode(&rights)
 	if err != nil {
-		log.Println("Error decoding rightsMetadata (%s):", id, err)
+		log.Printf("Error decoding rightsMetadata (%s): %s", id, err)
 		return nil
 	}
 
