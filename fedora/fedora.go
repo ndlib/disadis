@@ -156,7 +156,7 @@ func (tf *TestFedora) GetDatastream(id, dsname string) (io.ReadCloser, ContentIn
 	key := id + "/" + dsname
 	v, ok := tf.data[key]
 	if !ok {
-		return nil, ci, fmt.Errorf("No such element %s", key)
+		return nil, ci, FedoraNotFound
 	}
 	ci.Type = "text/plain"
 	ci.Length = fmt.Sprintf("%d", len(v))
@@ -167,7 +167,7 @@ func (tf *TestFedora) GetDatastreamInfo(id, dsname string) (DsInfo, error) {
 	key := id + "/" + dsname
 	_, ok := tf.data[key]
 	if !ok {
-		return DsInfo{}, fmt.Errorf("No such element %s", key)
+		return DsInfo{}, FedoraNotFound
 	}
 	return DsInfo{
 		Label:     "",
