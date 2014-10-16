@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -50,13 +51,32 @@ func (li *loginfo) Reopen() {
 	li.f = newf
 }
 
+func writePID(fname string) {
+	f, err := os.Create(fname)
+	if err != nil {
+		log.Printf("Error writing PID to file '%s': %s\n", fname, err.Error())
+		return
+	}
+	pid := os.Getpid()
+	fmt.Fprintf(f, "%d", pid)
+	f.Close()
+}
+
 func signalHandler(sig <-chan os.Signal, logw Reopener) {
 	for s := range sig {
-		log.Println("---Got", s)
+		log.Println("---Received signal", s)
 		switch s {
 		case syscall.SIGUSR1:
 			logw.Reopen()
+		case syscall.SIGINT, syscall.SIGTERM:
+			log.Println("Exiting")
+			if pidfilename != "" {
+				// we don't care if there is an error
+				os.Remove(pidfilename)
+			}
+			os.Exit(1)
 		}
+
 	}
 }
 
@@ -84,6 +104,10 @@ type Config struct {
 	}
 }
 
+var (
+	pidfilename string
+)
+
 func main() {
 	var (
 		logfilename string
@@ -110,6 +134,7 @@ func main() {
 		"name of cookie holding the rails 3 session")
 	flag.StringVar(&configFile, "config", "",
 		"name of config file to use")
+	flag.StringVar(&pidfilename, "pid", "", "file to store pid of server")
 
 	flag.Parse()
 
@@ -184,7 +209,15 @@ func main() {
 		return
 	}
 
+	if pidfilename != "" {
+		writePID(pidfilename)
+	}
+
 	runHandlers(config, fedora, ha)
+
+	if pidfilename != "" {
+		os.Remove(pidfilename)
+	}
 }
 
 type handlerBootstrap struct {
