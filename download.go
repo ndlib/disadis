@@ -135,22 +135,6 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// e-tag match?
-	// We keep this logic here even though ServeContent will also check the
-	// E-Tag header since if it matches, we won't need to hit fedora a second
-	// time for the ds content.
-	targetEtag := `"` + dsinfo.VersionID + `"`
-	etags, ok := r.Header["If-None-Match"]
-	if ok {
-		for i := range etags {
-			if etags[i] == targetEtag {
-				w.Header().Set("ETag", targetEtag)
-				w.WriteHeader(http.StatusNotModified)
-				return
-			}
-		}
-	}
-
 	// return content
 	content, info, err := dh.Fedora.GetDatastream(pid, dh.Ds)
 	if err != nil {
@@ -170,11 +154,12 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// fedora commons JIRA. This is why we pull the filename directly from
 	// the datastream label.
 	w.Header().Set("Content-Type", info.Type)
-	w.Header().Set("Content-Length", info.Length)
+	// This is set by ServeContent()
+	//w.Header().Set("Content-Length", info.Length)
 	w.Header().Set("Content-Disposition", `inline; filename="`+dsinfo.Label+`"`)
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	w.Header().Set("Cache-Control", "private")
-	w.Header().Set("ETag", targetEtag)
+	w.Header().Set("ETag", `"`+dsinfo.VersionID+`"`)
 
 	// use ServeContent and the StreamSeeker to handle range requests.
 	// when/if fedora ever supports range requests, this should be changed to
