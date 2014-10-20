@@ -119,6 +119,7 @@ func main() {
 		cookieName  string
 		configFile  string
 		config      Config
+		showVersion bool
 	)
 
 	flag.StringVar(&logfilename, "log", "", "name of log file. Defaults to stdout")
@@ -135,8 +136,14 @@ func main() {
 	flag.StringVar(&configFile, "config", "",
 		"name of config file to use")
 	flag.StringVar(&pidfilename, "pid", "", "file to store pid of server")
+	flag.BoolVar(&showVersion, "version", false, "Display the version and exit")
 
 	flag.Parse()
+
+	if showVersion {
+		fmt.Printf("disadis version %s\n", version)
+		return
+	}
 
 	// the config file stuff was grafted onto the command line options
 	// this should be made pretty
