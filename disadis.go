@@ -201,9 +201,6 @@ func main() {
 	default:
 		log.Printf("Warning: No authorization method given.")
 	}
-	if ha.CurrentUser == nil {
-		log.Printf("Warning: Only Allowing Public Access.")
-	}
 	if len(config.Handler) == 0 {
 		log.Printf("No Handlers are defined. Exiting.")
 		return
