@@ -20,7 +20,8 @@ import (
 	"github.com/ndlib/disadis/fedora"
 )
 
-type Reopener interface {
+// A reopener is a log file which knows how to re-open itself.
+type reopener interface {
 	Reopen()
 }
 
@@ -29,7 +30,7 @@ type loginfo struct {
 	f    *os.File
 }
 
-func NewReopener(filename string) *loginfo {
+func newReopener(filename string) *loginfo {
 	return &loginfo{name: filename}
 }
 
@@ -51,6 +52,7 @@ func (li *loginfo) Reopen() {
 	li.f = newf
 }
 
+// writePID writes the PID of this process to the file fname.
 func writePID(fname string) {
 	f, err := os.Create(fname)
 	if err != nil {
@@ -62,7 +64,7 @@ func writePID(fname string) {
 	f.Close()
 }
 
-func signalHandler(sig <-chan os.Signal, logw Reopener) {
+func signalHandler(sig <-chan os.Signal, logw reopener) {
 	for s := range sig {
 		log.Println("---Received signal", s)
 		switch s {
@@ -80,7 +82,8 @@ func signalHandler(sig <-chan os.Signal, logw Reopener) {
 	}
 }
 
-type Config struct {
+// the structure of our configuration file.
+type config struct {
 	General struct {
 		Log_filename string
 		Fedora_addr  string
@@ -111,14 +114,14 @@ var (
 func main() {
 	var (
 		logfilename string
-		logw        Reopener
+		logw        reopener
 		pubtktKey   string
 		fedoraAddr  string
 		secret      string
 		database    string
 		cookieName  string
 		configFile  string
-		config      Config
+		config      config
 		showVersion bool
 	)
 
@@ -162,7 +165,7 @@ func main() {
 
 	/* first set up the log file */
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-	logw = NewReopener(logfilename)
+	logw = newReopener(logfilename)
 	logw.Reopen()
 	log.Println("-----Starting Server")
 
@@ -231,7 +234,7 @@ type handlerBootstrap struct {
 
 // runHandlers starts a listener for each port in its own goroutine
 // and then waits for all of them to quit.
-func runHandlers(config Config, fedora fedora.Fedora, auth *auth.HydraAuth) {
+func runHandlers(config config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 	var wg sync.WaitGroup
 	portHandlers := make(map[string]*DsidMux)
 	// first create the handlers

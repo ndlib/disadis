@@ -48,19 +48,19 @@ func (dm *DsidMux) AddHandler(name string, h http.Handler) {
 	})
 }
 
-func (dim *DsidMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (dm *DsidMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dsid := r.FormValue("datastream_id")
 	if dsid == "" {
-		if dim.DefaultHandler != nil {
-			dim.DefaultHandler.ServeHTTP(w, r)
+		if dm.DefaultHandler != nil {
+			dm.DefaultHandler.ServeHTTP(w, r)
 		} else {
 			notFound(w)
 		}
 		return
 	}
-	for i := range dim.table {
-		if dim.table[i].name == dsid {
-			dim.table[i].h.ServeHTTP(w, r)
+	for i := range dm.table {
+		if dm.table[i].name == dsid {
+			dm.table[i].h.ServeHTTP(w, r)
 			return
 		}
 	}

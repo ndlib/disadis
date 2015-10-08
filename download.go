@@ -89,8 +89,8 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var (
-		pid         = dh.Prefix + components[0] // sanitize pid somehow?
-		version int = -1                        // -1 == current version
+		pid     = dh.Prefix + components[0] // sanitize pid somehow?
+		version = -1                        // -1 == current version
 	)
 	// auth?
 	if dh.Auth != nil {
@@ -139,7 +139,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	content, info, err := dh.Fedora.GetDatastream(pid, dh.Ds)
 	if err != nil {
 		switch err {
-		case fedora.FedoraNotFound:
+		case fedora.ErrNotFound:
 			notFound(w)
 			return
 		default:

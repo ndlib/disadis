@@ -37,9 +37,8 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
-// Gets the oldest item in the cache with the given key.
-// returns the ErrNotFound error if nothing is found.
-// Item is guarenteed to not be older than expires.
+// Get returns the oldest item in the cache with the given key.
+// The error ErrNotFound is returned if nothing is found.
 func (tc *timecache) Get(key string) (interface{}, error) {
 	var (
 		now = time.Now()
@@ -79,7 +78,7 @@ func (tc *timecache) Add(key string, value interface{}) error {
 
 // New creates a timecache which can store a maximum of size entires
 // and entries will be deleted after expires time has elapsed.
-func New(size int, expires time.Duration) *timecache {
+func New(size int, expires time.Duration) Cache {
 	c := make(chan struct{})
 	// add 1 to the size because the way we use head and tail
 	// the maximum capacity of the cache is len(data) - 1
@@ -100,11 +99,14 @@ func (tc *timecache) advance(i int) int {
 	return i
 }
 
+// backgroundCleaner removes expired items from the queue. It runs in a loop
+// sleeping either until the oldest element expires or 5 minutes if the queue
+// is empty.
 func (tc *timecache) backgroundCleaner(stop <-chan struct{}) {
 	var nextTime time.Time
 Outer:
 	for {
-		var timeout time.Duration = 5 * time.Minute
+		var timeout = 5 * time.Minute
 		if (!nextTime.IsZero()) && nextTime.Before(time.Now()) {
 			timeout = nextTime.Sub(time.Now())
 		}
@@ -117,9 +119,9 @@ Outer:
 	}
 }
 
-// prune expired entries from cache.
-// returns the expiry time of the oldest entry remaining in cache.
-// If the cache is empty, returns the 0 time.
+// prune removes all the expired entries from cache.
+// It Returns the expiry time of the oldest entry remaining in cache.
+// If the cache is empty, the 0 time is returned.
 // It is possible a non-zero time may be returned if the cache is empty.
 func (tc *timecache) prune() time.Time {
 	var oldestTime time.Time

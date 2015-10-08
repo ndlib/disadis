@@ -45,7 +45,7 @@ type mycount struct {
 	n int
 }
 
-func verifyEntry(tc *timecache, key string, exp mycount, exists bool, t *testing.T) {
+func verifyEntry(tc Cache, key string, exp mycount, exists bool, t *testing.T) {
 	v, err := tc.Get(key)
 	if err != nil && exists {
 		t.Fatalf("Could not find entry %s %v", key, exp)

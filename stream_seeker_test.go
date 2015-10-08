@@ -34,17 +34,17 @@ func TestStreamSeeker(t *testing.T) {
 	}
 	// seek with invalid whence
 	off, err = ss.Seek(0, 3)
-	if err != whenceError {
+	if err != ErrWhence {
 		t.Errorf("Expected error for bad whence, got %v", err)
 	}
 	// seek past end
 	off, err = ss.Seek(1, 2)
-	if err != seekerError {
+	if err != ErrInvalidPos {
 		t.Errorf("Expected error for seek past end, got %v", err)
 	}
 	// seek before beginning of stream
 	off, err = ss.Seek(-1, 0)
-	if err != seekerError {
+	if err != ErrInvalidPos {
 		t.Errorf("Expected error for seek before beginning, got %v", err)
 	}
 }

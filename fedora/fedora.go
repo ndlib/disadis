@@ -1,10 +1,5 @@
-/*
-Fedora provides a thin wrapper around the Fedora REST API.
-It is not complete. Only methods needed by disadis have been
-added.
-
-Perhaps it might be advisable to make this its own package.
-*/
+// Package fedora provides a thin wrapper around the Fedora REST API.
+// It is not complete. Only the methods needed by disadis are present.
 package fedora
 
 import (
@@ -19,9 +14,10 @@ import (
 	"strings"
 )
 
+// Exported errors
 var (
-	FedoraNotFound      = errors.New("Item Not Found in Fedora")
-	FedoraNotAuthorized = errors.New("Access Denied")
+	ErrNotFound      = errors.New("Item Not Found in Fedora")
+	ErrNotAuthorized = errors.New("Access Denied")
 )
 
 // Fedora represents a Fedora Commons server. The exact nature of the
@@ -35,6 +31,7 @@ type Fedora interface {
 	GetDatastreamInfo(id, dsname string) (DsInfo, error)
 }
 
+// ContentInfo holds the most basic metadata about a datastream.
 type ContentInfo struct {
 	// These fields are from the headers in the fedora response
 	// They may be empty strings, representing that the value is unknown
@@ -43,13 +40,13 @@ type ContentInfo struct {
 	Disposition string
 }
 
-// Create a reference to a remote Fedora instance.
-// Pass in a complete URL including username and password, if necessary.
+// NewRemote creates a reference to a remote Fedora repository.
+// fedoraPath is a complete URL including username and password, if necessary.
 // For example
 //	http://fedoraAdmin:password@localhost:8983/fedora/
-// This reference does not buffer or cache Fedora responses.
-// The namespace is of the form "temp:". It will be prefixed in front of
-// all object identifiers.
+// The namespace is expected to have the form "temp:", and it will be prefixed
+// to all object identifiers.
+// The returned structure does not buffer or cache Fedora responses.
 func NewRemote(fedoraPath string, namespace string) Fedora {
 	rf := &remoteFedora{hostpath: fedoraPath, namespace: namespace}
 	if rf.hostpath[len(rf.hostpath)-1] != '/' {
@@ -67,7 +64,7 @@ type remoteFedora struct {
 // The returned stream needs to be closed when finished.
 func (rf *remoteFedora) GetDatastream(id, dsname string) (io.ReadCloser, ContentInfo, error) {
 	// TODO: make this joining smarter wrt not duplicating slashes
-	var path string = rf.hostpath + "objects/" + rf.namespace + id + "/datastreams/" + dsname + "/content"
+	var path = rf.hostpath + "objects/" + rf.namespace + id + "/datastreams/" + dsname + "/content"
 	var info ContentInfo
 	r, err := http.Get(path)
 	if err != nil {
@@ -77,9 +74,9 @@ func (rf *remoteFedora) GetDatastream(id, dsname string) (io.ReadCloser, Content
 		r.Body.Close()
 		switch r.StatusCode {
 		case 404:
-			return nil, info, FedoraNotFound
+			return nil, info, ErrNotFound
 		case 401:
-			return nil, info, FedoraNotAuthorized
+			return nil, info, ErrNotAuthorized
 		default:
 			return nil, info, fmt.Errorf("Received status %d from fedora", r.StatusCode)
 		}
@@ -90,6 +87,8 @@ func (rf *remoteFedora) GetDatastream(id, dsname string) (io.ReadCloser, Content
 	return r.Body, info, nil
 }
 
+// DsInfo holds more complete metadata on a datastream (as opposed to the
+// ContentInfo structure)
 type DsInfo struct {
 	Label     string `xml:"dsLabel"`
 	VersionID string `xml:"dsVersionID"`
@@ -99,7 +98,7 @@ type DsInfo struct {
 
 func (rf *remoteFedora) GetDatastreamInfo(id, dsname string) (DsInfo, error) {
 	// TODO: make this joining smarter wrt not duplicating slashes
-	var path string = rf.hostpath + "objects/" + rf.namespace + id + "/datastreams/" + dsname + "?format=xml"
+	var path = rf.hostpath + "objects/" + rf.namespace + id + "/datastreams/" + dsname + "?format=xml"
 	var info DsInfo
 	r, err := http.Get(path)
 	if err != nil {
@@ -109,9 +108,9 @@ func (rf *remoteFedora) GetDatastreamInfo(id, dsname string) (DsInfo, error) {
 		r.Body.Close()
 		switch r.StatusCode {
 		case 404:
-			return info, FedoraNotFound
+			return info, ErrNotFound
 		case 401:
-			return info, FedoraNotAuthorized
+			return info, ErrNotAuthorized
 		default:
 			return info, fmt.Errorf("Received status %d from fedora", r.StatusCode)
 		}
@@ -140,6 +139,7 @@ func (info DsInfo) Version() int {
 	return version
 }
 
+// NewTestFedora creates an empty TestFedora object.
 func NewTestFedora() *TestFedora {
 	return &TestFedora{data: make(map[string][]byte)}
 }
@@ -151,23 +151,26 @@ type TestFedora struct {
 	data map[string][]byte
 }
 
+// GetDatastream returns a ReadCloser which holds the content of the named
+// datastream on the given fedora object.
 func (tf *TestFedora) GetDatastream(id, dsname string) (io.ReadCloser, ContentInfo, error) {
 	ci := ContentInfo{}
 	key := id + "/" + dsname
 	v, ok := tf.data[key]
 	if !ok {
-		return nil, ci, FedoraNotFound
+		return nil, ci, ErrNotFound
 	}
 	ci.Type = "text/plain"
 	ci.Length = fmt.Sprintf("%d", len(v))
 	return ioutil.NopCloser(bytes.NewReader(v)), ci, nil
 }
 
+// GetDatastreamInfo returns Fedora's metadata for the given datastream.
 func (tf *TestFedora) GetDatastreamInfo(id, dsname string) (DsInfo, error) {
 	key := id + "/" + dsname
 	_, ok := tf.data[key]
 	if !ok {
-		return DsInfo{}, FedoraNotFound
+		return DsInfo{}, ErrNotFound
 	}
 	return DsInfo{
 		Label:     "",
@@ -177,6 +180,7 @@ func (tf *TestFedora) GetDatastreamInfo(id, dsname string) (DsInfo, error) {
 	}, nil
 }
 
+// Set the given datastream to have the given content.
 func (tf *TestFedora) Set(id, dsname string, value []byte) {
 	key := id + "/" + dsname
 	tf.data[key] = value
