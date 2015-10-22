@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"code.google.com/p/gcfg"
 	_ "github.com/go-sql-driver/mysql"
+	gcfg "gopkg.in/gcfg.v1"
 
 	"github.com/ndlib/disadis/auth"
 	"github.com/ndlib/disadis/fedora"
