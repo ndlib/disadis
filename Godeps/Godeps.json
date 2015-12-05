@@ -1,6 +1,9 @@
 {
 	"ImportPath": "github.com/ndlib/disadis",
 	"GoVersion": "go1.5.1",
+	"Packages": [
+		"./..."
+	],
 	"Deps": [
 		{
 			"ImportPath": "github.com/adeven/gorails/marshal",
@@ -14,6 +17,10 @@
 		{
 			"ImportPath": "github.com/mattetti/goRailsYourself/crypto",
 			"Rev": "540d176560cd8178185bb65a4c6ab672d576cb51"
+		},
+		{
+			"ImportPath": "github.com/mxk/go-sqlite/sqlite3",
+			"Rev": "167da9432e1f4602e95ea67b67051cfa34412e3f"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/pbkdf2",
