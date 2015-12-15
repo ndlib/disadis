@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"flag"
 	"fmt"
 	"log"
@@ -13,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	gcfg "gopkg.in/gcfg.v1"
 
 	"github.com/ndlib/disadis/auth"
@@ -92,11 +90,6 @@ type config struct {
 	Pubtkt struct {
 		Key_file string
 	}
-	Rails struct {
-		Secret   string
-		Cookie   string
-		Database string
-	}
 	Handler map[string]*struct {
 		Port          string
 		Auth          bool
@@ -117,9 +110,6 @@ func main() {
 		logw        reopener
 		pubtktKey   string
 		fedoraAddr  string
-		secret      string
-		database    string
-		cookieName  string
 		configFile  string
 		config      config
 		showVersion bool
@@ -130,12 +120,6 @@ func main() {
 		"filename of PEM encoded public key to use for pubtkt authentication")
 	flag.StringVar(&fedoraAddr, "fedora", "",
 		"url to use for fedora, includes username and password, if needed")
-	flag.StringVar(&secret, "secret", "",
-		"secret to use to verify rails 3 cookies")
-	flag.StringVar(&database, "db", "",
-		"path and credentials to access the user database (mysql). Needed if --secret is given")
-	flag.StringVar(&cookieName, "cookie", "",
-		"name of cookie holding the rails 3 session")
 	flag.StringVar(&configFile, "config", "",
 		"name of config file to use")
 	flag.StringVar(&pidfilename, "pid", "", "file to store pid of server")
@@ -158,9 +142,6 @@ func main() {
 		logfilename = config.General.Log_filename
 		fedoraAddr = config.General.Fedora_addr
 		pubtktKey = config.Pubtkt.Key_file
-		secret = config.Rails.Secret
-		database = config.Rails.Database
-		cookieName = config.Rails.Cookie
 	}
 
 	/* first set up the log file */
@@ -187,27 +168,6 @@ func main() {
 	case pubtktKey != "":
 		log.Printf("Using pubtkt %s", pubtktKey)
 		ha.CurrentUser = auth.NewPubtktAuthFromKeyFile(pubtktKey)
-	case secret != "":
-		log.Printf("Using Rails 3 cookies")
-		if cookieName == "" {
-			log.Printf("Warning: The name of the cookie holding the rails session is required (--cookie)")
-			break
-		}
-		log.Printf("Cookie name '%s'", cookieName)
-		if database == "" {
-			log.Printf("Warning: A database (--db) is required to use rails cookies")
-			break
-		}
-		db, err := sql.Open("mysql", database)
-		if err != nil {
-			log.Printf("Error opening database connection: %s", err)
-			break
-		}
-		ha.CurrentUser = &auth.DeviseAuth{
-			SecretBase: []byte(secret),
-			CookieName: cookieName,
-			Lookup:     &auth.DatabaseUser{Db: db},
-		}
 	default:
 		log.Printf("Warning: No authorization method given.")
 	}

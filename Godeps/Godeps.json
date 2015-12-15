@@ -1,31 +1,13 @@
 {
 	"ImportPath": "github.com/ndlib/disadis",
-	"GoVersion": "go1.5.1",
+	"GoVersion": "go1.5.2",
 	"Packages": [
-		"./..."
+		".",
+		"./auth",
+		"./fedora",
+		"./timecache"
 	],
 	"Deps": [
-		{
-			"ImportPath": "github.com/adeven/gorails/marshal",
-			"Rev": "8b71de31c60ba48ded46cbbf4fff6cbce59824ad"
-		},
-		{
-			"ImportPath": "github.com/go-sql-driver/mysql",
-			"Comment": "v1.2-125-gd512f20",
-			"Rev": "d512f204a577a4ab037a1816604c48c9c13210be"
-		},
-		{
-			"ImportPath": "github.com/mattetti/goRailsYourself/crypto",
-			"Rev": "540d176560cd8178185bb65a4c6ab672d576cb51"
-		},
-		{
-			"ImportPath": "github.com/mxk/go-sqlite/sqlite3",
-			"Rev": "167da9432e1f4602e95ea67b67051cfa34412e3f"
-		},
-		{
-			"ImportPath": "golang.org/x/crypto/pbkdf2",
-			"Rev": "7b85b097bf7527677d54d3220065e966a0e3b613"
-		},
 		{
 			"ImportPath": "gopkg.in/gcfg.v1",
 			"Rev": "a3bc0742e3bbfd16123e6cee742cadec9a3301d2"

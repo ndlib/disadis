@@ -27,7 +27,7 @@ func TestCanView(t *testing.T) {
 	}
 	var u User
 	for _, z := range table {
-		u.Id = z.user
+		u.ID = z.user
 		u.Groups = z.groups
 		a := hr.canView(u)
 		if a != z.allowed {
@@ -37,7 +37,7 @@ func TestCanView(t *testing.T) {
 
 	hr.readGroups = append(hr.readGroups, "registered")
 	for _, z := range table {
-		u.Id = z.user
+		u.ID = z.user
 		u.Groups = z.groups
 		a := hr.canView(u)
 		if a != z.registered {
@@ -47,7 +47,7 @@ func TestCanView(t *testing.T) {
 
 	hr.readGroups = append(hr.readGroups, "public")
 	for _, z := range table {
-		u.Id = z.user
+		u.ID = z.user
 		u.Groups = z.groups
 		a := hr.canView(u)
 		if a != AuthAllow {
@@ -57,7 +57,7 @@ func TestCanView(t *testing.T) {
 
 	hr.embargo = time.Now().Add(time.Hour)
 	for _, z := range table {
-		u.Id = z.user
+		u.ID = z.user
 		u.Groups = z.groups
 		a := hr.canView(u)
 		if a != z.embargo {
@@ -67,7 +67,7 @@ func TestCanView(t *testing.T) {
 
 	hr.version = "0.2"
 	for _, z := range table {
-		u.Id = z.user
+		u.ID = z.user
 		u.Groups = z.groups
 		a := hr.canView(u)
 		if a == AuthAllow {

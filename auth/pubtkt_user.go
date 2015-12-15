@@ -108,7 +108,7 @@ func (pa *PubtktAuth) User(r *http.Request) User {
 		return User{}
 	}
 
-	return User{Id: t.UID, Groups: t.Tokens}
+	return User{ID: t.UID, Groups: t.Tokens}
 }
 
 // verify the message text against signature using the public key

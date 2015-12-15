@@ -22,7 +22,7 @@ func NewHydraAuth(fedoraPath, namespace string) *HydraAuth {
 
 // HydraAuth will validate requests against Hydra rights metadata stored
 // in some fedora instance. It is intended to be called from your own
-// http.Handler. Check() is safe to be called concurrently my many goroutines.
+// http.Handler. Check() is safe to be called concurrently by many goroutines.
 //
 // CurrentUser is used to determine the current user given a request.
 // It may make HTTP calls or perform database lookups to resolve things,
@@ -50,7 +50,7 @@ type RequestUser interface {
 // A User is an identifier and a list of groups which the user belongs to.
 // The zero User represents the anonymous user.
 type User struct {
-	Id     string
+	ID     string
 	Groups []string
 }
 
@@ -58,6 +58,7 @@ type User struct {
 // The possible values are the Auth* constants.
 type Authorization int
 
+// Defined Authorizations.
 const (
 	AuthDeny     Authorization = iota // the user should NOT see the object
 	AuthAllow                         // the user should see the object
@@ -90,17 +91,17 @@ func (ha *HydraAuth) Check(r *http.Request, id string) Authorization {
 		return AuthDeny
 	}
 	u = ha.CurrentUser.User(r)
-	log.Printf("Found user '%s', %#v", u.Id, u.Groups)
+	log.Printf("Found user '%s', %#v", u.ID, u.Groups)
 	// is admin user?
-	if member(u.Id, ha.Admin) || incommon(u.Groups, ha.Admin) {
-		log.Printf("user %s is admin", u.Id)
+	if member(u.ID, ha.Admin) || incommon(u.Groups, ha.Admin) {
+		log.Printf("user %s is admin", u.ID)
 		return AuthAllow
 	}
 	return rights.canView(u)
 }
 
 // hydraRights contains the rights associated to a given hydra object.
-// It can then be checked against a User
+// It can then be checked against a User.
 type hydraRights struct {
 	readGroups []string
 	readPeople []string
@@ -113,14 +114,14 @@ type hydraRights struct {
 // Compare an items access rights against a User to see if view access should be
 // granted. It will return AuthAllow if the user is allowed to see the item,
 // AuthDeny if the user cannot see the item, or one of the other authorization
-// codes if there is an error
+// codes if there is an error.
 func (hr *hydraRights) canView(user User) Authorization {
 	if hr.version != "0.1" {
 		return AuthError
 	}
 	if time.Now().Before(hr.embargo) {
 		// only edit people can view
-		if member(user.Id, hr.editPeople) ||
+		if member(user.ID, hr.editPeople) ||
 			incommon(user.Groups, hr.editGroups) {
 			return AuthAllow
 		}
@@ -133,14 +134,14 @@ func (hr *hydraRights) canView(user User) Authorization {
 	}
 
 	// registered?
-	if user.Id != "" &&
+	if user.ID != "" &&
 		(member("registered", hr.readGroups) || member("registered", hr.editGroups)) {
 		return AuthAllow
 	}
 	if incommon(user.Groups, hr.readGroups) || incommon(user.Groups, hr.editGroups) {
 		return AuthAllow
 	}
-	if member(user.Id, hr.readPeople) || member(user.Id, hr.editPeople) {
+	if member(user.ID, hr.readPeople) || member(user.ID, hr.editPeople) {
 		return AuthAllow
 	}
 	return AuthDeny
@@ -149,21 +150,21 @@ func (hr *hydraRights) canView(user User) Authorization {
 // the []string structures should be replaced by a generic set datatype.
 // perhaps a map[string]bool ?
 
-// rightsMetadata is used to decode the hydra rightsMetadata xml data
+// rightsMetadata is used to decode the hydra rightsMetadata xml data.
 type rightsMetadata struct {
 	Version string           `xml:"version,attr"`
 	Access  []accessMetadata `xml:"access"`
 	Embargo string           `xml:"embargo>machine>date"`
 }
 
-// accessMetadata is used to decode the hydra rightsMetadata xml data
+// accessMetadata is used to decode the hydra rightsMetadata xml data.
 type accessMetadata struct {
 	Kind   string   `xml:"type,attr"`
 	People []string `xml:"machine>person"`
 	Groups []string `xml:"machine>group"`
 }
 
-// given an object identifier, get and decode the rights metadata for it
+// given an object identifier, get and decode the rights metadata for it.
 func (ha *HydraAuth) getRights(id string) *hydraRights {
 	v, err := ha.cache.Get(id)
 	if err == nil {
