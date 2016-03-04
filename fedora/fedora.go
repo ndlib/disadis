@@ -81,6 +81,8 @@ func (rf *remoteFedora) GetDatastream(id, dsname string) (io.ReadCloser, Content
 			return nil, info, fmt.Errorf("Received status %d from fedora", r.StatusCode)
 		}
 	}
+	// if fedora had an R datastream then these headers are comming from
+	// wherever fedora redirected us, and NOT from fedora.
 	info.Type = r.Header.Get("Content-Type")
 	info.Length = r.Header.Get("Content-Length")
 	info.Disposition = r.Header.Get("Content-Disposition")
