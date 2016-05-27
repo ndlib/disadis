@@ -148,7 +148,7 @@ func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 	logw = newReopener(logfilename)
 	logw.Reopen()
-	log.Println("-----Starting Server")
+	log.Println("-----Starting Disadis Server", Version)
 
 	/* set up signal handlers */
 	sig := make(chan os.Signal, 5)
