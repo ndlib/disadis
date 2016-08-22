@@ -153,7 +153,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// sometimes fedora appends an extra extension. See FCREPO-497 in the
 	// fedora commons JIRA. This is why we pull the filename directly from
 	// the datastream label.
-	w.Header().Set("Content-Type", info.Type)
+	w.Header().Set("Content-Type", dsinfo.MIMEType)
 	// This is set by ServeContent()
 	//w.Header().Set("Content-Length", info.Length)
 	w.Header().Set("Content-Disposition", `inline; filename="`+dsinfo.Label+`"`)

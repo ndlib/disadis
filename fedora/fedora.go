@@ -92,10 +92,13 @@ func (rf *remoteFedora) GetDatastream(id, dsname string) (io.ReadCloser, Content
 // DsInfo holds more complete metadata on a datastream (as opposed to the
 // ContentInfo structure)
 type DsInfo struct {
-	Label     string `xml:"dsLabel"`
-	VersionID string `xml:"dsVersionID"`
-	State     string `xml:"dsState"`
-	Checksum  string `xml:"dsChecksum"`
+	Label        string `xml:"dsLabel"`
+	VersionID    string `xml:"dsVersionID"`
+	State        string `xml:"dsState"`
+	Checksum     string `xml:"dsChecksum"`
+	MIMEType     string `xml:"dsMIME"`
+	Location     string `xml:"dsLocation"`
+	LocationType string `xml:"dsLocationType"`
 }
 
 func (rf *remoteFedora) GetDatastreamInfo(id, dsname string) (DsInfo, error) {
