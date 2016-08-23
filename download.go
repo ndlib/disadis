@@ -136,6 +136,8 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// return content
+	// TODO(dbrower): should we see if the dsinfo.LocationType is "URL"?
+	// then we don't need to hit fedora just to get a redirect.
 	content, info, err := dh.Fedora.GetDatastream(pid, dh.Ds)
 	if err != nil {
 		switch err {
@@ -153,10 +155,14 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// sometimes fedora appends an extra extension. See FCREPO-497 in the
 	// fedora commons JIRA. This is why we pull the filename directly from
 	// the datastream label.
+	w.Header().Set("Content-Disposition", `inline; filename="`+dsinfo.Label+`"`)
+	// set content-type from the datastream info instead of the returned header.
+	// (since if we redirect to bendo, we get bendo's content-type and bendo has no
+	// idea of what it should be)
+	w.Header().Set("Content-Type", info.Type)
 	w.Header().Set("Content-Type", dsinfo.MIMEType)
 	// This is set by ServeContent()
 	//w.Header().Set("Content-Length", info.Length)
-	w.Header().Set("Content-Disposition", `inline; filename="`+dsinfo.Label+`"`)
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	w.Header().Set("Cache-Control", "private")
 	w.Header().Set("ETag", `"`+dsinfo.VersionID+`"`)

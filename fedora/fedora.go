@@ -146,14 +146,19 @@ func (info DsInfo) Version() int {
 
 // NewTestFedora creates an empty TestFedora object.
 func NewTestFedora() *TestFedora {
-	return &TestFedora{data: make(map[string][]byte)}
+	return &TestFedora{data: make(map[string]dspair)}
 }
 
 // TestFedora implements a simple in-memory Fedora stub which will return bytes which have
 // already been specified by Set().
 // Intended for testing. (Maybe move to a testing file?)
 type TestFedora struct {
-	data map[string][]byte
+	data map[string]dspair
+}
+
+type dspair struct {
+	info    DsInfo
+	content []byte
 }
 
 // GetDatastream returns a ReadCloser which holds the content of the named
@@ -166,27 +171,34 @@ func (tf *TestFedora) GetDatastream(id, dsname string) (io.ReadCloser, ContentIn
 		return nil, ci, ErrNotFound
 	}
 	ci.Type = "text/plain"
-	ci.Length = fmt.Sprintf("%d", len(v))
-	return ioutil.NopCloser(bytes.NewReader(v)), ci, nil
+	ci.Length = fmt.Sprintf("%d", len(v.content))
+	return ioutil.NopCloser(bytes.NewReader(v.content)), ci, nil
 }
 
 // GetDatastreamInfo returns Fedora's metadata for the given datastream.
 func (tf *TestFedora) GetDatastreamInfo(id, dsname string) (DsInfo, error) {
 	key := id + "/" + dsname
-	_, ok := tf.data[key]
+	v, ok := tf.data[key]
 	if !ok {
 		return DsInfo{}, ErrNotFound
 	}
-	return DsInfo{
-		Label:     "",
-		VersionID: dsname + ".0",
-		State:     "A",
-		Checksum:  "",
-	}, nil
+	return v.info, nil
 }
 
 // Set the given datastream to have the given content.
-func (tf *TestFedora) Set(id, dsname string, value []byte) {
+func (tf *TestFedora) Set(id, dsname string, info DsInfo, value []byte) {
+	if info.State == "" {
+		info.State = "A"
+	}
+	if info.VersionID == "" {
+		info.VersionID = dsname + ".0"
+	}
+	if info.Location == "" {
+		info.Location = fmt.Sprintf("%s+%s+%s", id, dsname, info.VersionID)
+	}
+	if info.LocationType == "" {
+		info.LocationType = "INTERNAL_ID"
+	}
 	key := id + "/" + dsname
-	tf.data[key] = value
+	tf.data[key] = dspair{info, value}
 }

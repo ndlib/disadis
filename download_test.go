@@ -48,6 +48,34 @@ func TestDownload(t *testing.T) {
 		checkRoute(t, s.verb, ts.URL+s.route, s.status, s.expected)
 	}
 }
+
+// See if the returned content type is pulled from the datastream metadata and not
+// from the returned Content-Type. (DLTP-568)
+func TestDLTP568(t *testing.T) {
+	ts := setupHandler()
+	defer ts.Close()
+
+	table := []struct {
+		verb, route, contenttype string
+	}{
+		{"GET", "/redirect", "audio/mpeg"},
+		{"HEAD", "/redirect", "audio/mpeg"},
+		{"GET", "/0123", ""},
+		{"HEAD", "/0123", ""},
+	}
+	for _, s := range table {
+		checkContentType(t, s.verb, ts.URL+s.route, 200, s.contenttype)
+	}
+}
+
+func checkContentType(t *testing.T, verb, route string, status int, expectedType string) {
+	r, _ := checkRouteX(t, verb, route, status, "", nil)
+	recvType := r.Header.Get("Content-Type")
+	if recvType != expectedType {
+		t.Errorf("%s: Expected %s, Received %s", route, expectedType, recvType)
+	}
+}
+
 func checkRoute(t *testing.T, verb, route string, status int, expected string) {
 	checkRouteX(t, verb, route, status, expected, nil)
 }
@@ -101,14 +129,21 @@ func TestRangeRequest(t *testing.T) {
 	})
 }
 
+// setupHandler returns a test server seeded with some content.
 func setupHandler() *httptest.Server {
-	tFedora := fedora.NewTestFedora()
-	tFedora.Set("test:0123", "content", []byte("hello"))
-	tFedora.Set("test:123", "content", []byte("goodbye"))
-	tFedora.Set("test:abc", "content", []byte("a longer string"))
-	tFedora.Set("another:xyz", "content", []byte("hola"))
+	tf := fedora.NewTestFedora()
+	tf.Set("test:0123", "content", fedora.DsInfo{}, []byte("hello"))
+	tf.Set("test:123", "content", fedora.DsInfo{}, []byte("goodbye"))
+	tf.Set("test:abc", "content", fedora.DsInfo{}, []byte("a longer string"))
+	tf.Set("another:xyz", "content", fedora.DsInfo{}, []byte("hola"))
+	tf.Set("test:redirect",
+		"content",
+		fedora.DsInfo{Location: "http://example.com/another/file",
+			LocationType: "URL",
+			MIMEType:     "audio/mpeg"},
+		[]byte("audio stream")) // for DLTP-568
 	h := &DownloadHandler{
-		Fedora:    tFedora,
+		Fedora:    tf,
 		Ds:        "content",
 		Versioned: true,
 		Prefix:    "test:",
