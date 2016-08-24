@@ -146,17 +146,17 @@ func (info DsInfo) Version() int {
 
 // NewTestFedora creates an empty TestFedora object.
 func NewTestFedora() *TestFedora {
-	return &TestFedora{data: make(map[string]dspair)}
+	return &TestFedora{data: make(map[string]dsPair)}
 }
 
 // TestFedora implements a simple in-memory Fedora stub which will return bytes which have
 // already been specified by Set().
 // Intended for testing. (Maybe move to a testing file?)
 type TestFedora struct {
-	data map[string]dspair
+	data map[string]dsPair
 }
 
-type dspair struct {
+type dsPair struct {
 	info    DsInfo
 	content []byte
 }
@@ -200,5 +200,5 @@ func (tf *TestFedora) Set(id, dsname string, info DsInfo, value []byte) {
 		info.LocationType = "INTERNAL_ID"
 	}
 	key := id + "/" + dsname
-	tf.data[key] = dspair{info, value}
+	tf.data[key] = dsPair{info, value}
 }
