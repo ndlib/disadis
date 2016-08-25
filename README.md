@@ -2,12 +2,13 @@ Disadis
 =======
 
 Disadis is an authorization proxy for Hydra-based applications.
-It is designed to proxy content out of Fedora,
-or to verify authorization and redirect requests to other content delivery methods.
-Disadis takes the burden of downloads from the hydra application.
-It is designed to be fast, as well as understanding `hydraRightsmetadata` datastreams.
-It can be adapted to work with different ways of indication user identity in the request.
-At the moment it supports rails cookies and [auth-pubtkt](https://neon1.net/mod_auth_pubtkt/) headers.
+It will proxy content out of a Fedora 3 instance, so your Ruby application doesn't have to
+use a valuable instance doing an otherwise mindless task.
+Our preferred setup is to have the rails application handle the download request and
+then, if everything is ok, use an nginx internal redirect to ask disadis to start and
+monitor the actual download to the client.
+Disadis can also verify authorization and understands the Hydra `rightsMetadata` datastream
+a limited amount.
 
 Disadis
 
@@ -15,6 +16,7 @@ Disadis
 * provides E-tags.
 * responds to `GET` and `HEAD` requests.
 * assumes the filename is the label of the datastream.
+* handles range requests
 
 Each handler can optionally use authorization or not.
 This way, say, thumbnails can just be served without doing any authorization.
@@ -84,10 +86,6 @@ location ^~ /downloads/ {
 
 # Future
 
-* Range requests
-* [X-Acel-Redirect](http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_ignore_headers)
-* Verify CAS tickets
-* Support more than one authorization method
 * Is there a simpler way to configure the whole thing? It seems too complicated to me.
 * Support config reloading and graceful shutdowns
 * Add metrics to track the cache hit/miss rates
