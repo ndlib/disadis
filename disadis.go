@@ -187,11 +187,6 @@ func main() {
 	}
 }
 
-type handlerBootstrap struct {
-	h    http.Handler
-	name string
-}
-
 // runHandlers starts a listener for each port in its own goroutine
 // and then waits for all of them to quit.
 func runHandlers(config config, fedora fedora.Fedora, auth *auth.HydraAuth) {
