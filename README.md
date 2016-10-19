@@ -1,41 +1,87 @@
 Disadis
 =======
 
-Disadis is an authorization proxy for Hydra-based applications.
-It will proxy content out of a Fedora 3 instance, so your Ruby application doesn't have to
-use a valuable instance doing an otherwise mindless task.
-Our preferred setup is to have the rails application handle the download request and
-then, if everything is ok, use an nginx internal redirect to ask disadis to start and
-monitor the actual download to the client.
-Disadis can also verify authorization and understands the Hydra `rightsMetadata` datastream
-a limited amount.
+Disadis is an download proxy for Hydra-based applications.
+It will proxy content out of a Fedora 3 instance, so your Ruby application
+doesn't have to devote a valuable app instance to doing an otherwise mindless
+task.
+Our preferred setup is to have the rails application handle the download request
+initially, and then, if the user is authorized, redirect to disadis by way of an
+nginx internal redirect.
+Then disadis will start and monitor the actual download to the client.
+While the original design of disadis had it verifying Hydra authorization with
+the `rightsMetadata` datastream, the authorization semantics have gotten
+complicated enough that we no longer recommend using this feature.
+(We bring it up only for those reading the code.)
 
-Disadis
+Features of Disadis include
 
-* supports the sufia `/downloads/` route as well as an extension which includes version information.
-* provides E-tags.
-* responds to `GET` and `HEAD` requests.
-* assumes the filename is the label of the datastream.
+* provides E-tags based on datastream version numbers
+* responds to `GET` and `HEAD` requests
 * handles range requests
+* forces the allowable datastreams to download to be whitelisted
+* assumes the filename is the label of the datastream
+* can handle an arbitrary number of simultaneous downloads
+* uses a minimal amount of memory since all downloads are streamed
 
-Each handler can optionally use authorization or not.
-This way, say, thumbnails can just be served without doing any authorization.
-The handlers can each specify which datastream to proxy.
+# Use
+
+The daemon will listen on several ports for incoming HTTP requests.
+The exact ports and the number of them is determined by the configuration file.
+Each port can have a number of _handlers_ attached to it.
+Usually each datastream name you wish to proxy will have its own handler.
+On each port requests are expected to have the form `/:id` or `/:id?datastream_id=XXX`.
+The `id` can have some prefixed attached to it, and then fedora is checked for
+the object and the given datastream, with the content being proxied back if it
+exists.
 
 # Configuration
 
-The code was originally written to expose each handler on a seperate port.
-However, being able to directly replace sufia's `/downloads/` route was too tempting,
-and so multiple handlers can be combined on a single port.
-In that case the handlers are disambiguated not by path or method,
-but by the `datastream_id` parameter.
-
 The daemon takes a command line argument which names a configuration file.
-The file gives how to determine the current user from a request, the handlers to set up, and the address fedora is at.
+The file gives how to determine the current user from a request, the handlers to
+set up, and the URL to use to address fedora.
 
-# Example
+The configuration file consists of a number of sections, which may appear in any order.
+The first section `[general]` has two variables to set:
 
-The following config file duplicates the sufia `/downloads/` handler.
+ * `log-filename` is the name of the log file to use. If none is provided, logging is sent to `stdout`.
+ * `fedora-addr` is the root URL to use to access your fedora instance.
+ It should include the fedora username and password if those are needed to download content from your fedora.
+
+Sample section:
+
+    [general]
+    fedora-addr = http://fedoraAdmin:fedoraAdmin@localhost:8983/fedora
+    log-filename = /var/log/disadis/log.txt
+
+The other sections each specisify a handler.
+There will be as many additional sections as you need for each handler.
+The section name is `[Handler "name"]` where `name` is the name you want to use for this handler.
+Inside the section there are a few variables to set for that handler.
+
+ * `port` is the port number disadis should listen on for this handler.
+ * `versioned` is whether disadis should support the versioned url. One of `true` or `false`. Defaults to `false`.
+ * `prefix` is the prefix, if any, to add to the identifier in the URL.
+ * `Datastream` is the datastream to proxy of the item in fedora.
+ * `Datastream-id` is the `datastream_id` name you want to associate this handler with.
+ Either not setting it or using the name `default` makes this the handler used when there is
+ no `datastream_id` parameter on the incoming request.
+
+A sample handler would look like
+
+    [Handler "thumbnail"]
+    datastream = thumbnail
+    prefix = sufia:
+    port = 4000
+    datastream-id = thumbnail
+
+This configuration will have disadis listen to localhost:4000, and any requests
+of the form `/{id}?datastream_id=thumbnail` will result in the download of the
+datastream `thumbnail` from the object `sufia:{id}`.
+
+## Example
+
+A complete configuration file would look similar to the following.
 
 ```
 [general]
@@ -44,48 +90,63 @@ fedora-addr = http://fedoraAdmin:fedoraAdmin@localhost:8983/fedora
 [Handler "thumbnail"]
 datastream = thumbnail
 prefix = sufia:
-port = 8081
-datastream-id = thumbnail
+port = 4000
+datastream-id = thumb
 
 [Handler "dl"]
-auth = true
 datastream = content
-port = 8081
-prefix = vecnet:
+port = 4000
+prefix = sufia:
 ```
 
-This will have disadis listen on port 8081 for connections.
-The thumbnail handler proxies out the thumbnail datastream,
-does not perform authentication,
-and assumes any identifiers have the namespace of `sufia:`.
-The `datastream-id` tells disadis to route requests having `datastream_id=thumbnail`
-to this handler.
-The `dl` handler serves the `content` datastream, and since it is missing
-a `datastream-id` field, it is the default handler for port 8081.
+This configuration will have disadis listen on port 4000 for connections.
+HTTP requests to path `/{id}` result in the download of the `content` datastream
+of the fedora object `sufia:{id}`.
+Requests to the path `/{id}?datastream_id=thumb` result in the download of
+the `thumbnail` datastream.
 
-Disadis assumes the requests it receives have the form `/:id` or, optionally, `/:id/:version`.
-(The latter are only used if a handler has `versioned = true` in its config section).
-This means requests routed to disadis need to have their initial path prefix stripped.
-The following nginx config handles this.
-This configuration also redirects any errors back to `@app`, so a common error page can
-be displayed.
+## Versioned 
+
+If a datastream handler is has `versioned` set to `true`, then
+paths of the form `/{id}/{version}` are handled, where `version` refers
+to the integer fedora datastream number.
+Requests without a version are assigned the most current version for that datastream.
+For the moment, requests to versions besides the most current version are denied
+with a 404 error.
+
+# Nginx Redirects
+
+The nginx internal redirect is handled by first defining an internal location in
+your nginx config file.
+The following block provides a template you can use.
 
 ```
-location ^~ /downloads/ {
-    proxy_intercept_errors on;
-    error_page 401 404 = @app;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+location ^~ /download-internal/ {
+    internal;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
-    proxy_redirect off;
-    proxy_buffering off;
-    proxy_pass http://127.0.0.1:8081/;
+    proxy_redirect   off;
+    proxy_buffering  off;
+    proxy_pass       http://127.0.0.1:4000/;
 }
 ```
+
+And then the rails application can pass control to the disadis daemon
+by setting the header `X-Accel-Redirect` to the route `/download-internal/{id}`
+and then returning without writing a response body.
+The following code in Rails shows one way of doing it.
+(In this case the fedora id is in the variable `asset.noid`)
+
+    response.headers['X-Accel-Redirect'] = "/download-internal/#{asset.noid}"
+    head :ok
+
+Nginx will then send the request to disadis.
+The client does not see any of the internal redirects--as far as the client is
+concerned, there is only a single request and a single response.
 
 # Future
 
 * Is there a simpler way to configure the whole thing? It seems too complicated to me.
 * Support config reloading and graceful shutdowns
-* Add metrics to track the cache hit/miss rates
