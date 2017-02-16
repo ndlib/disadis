@@ -1,10 +1,10 @@
+Disadis
+=======
+
 [![APACHE 2
 License](http://img.shields.io/badge/APACHE2-license-blue.svg)](./LICENSE)
 [![Go Report
 Card](https://goreportcard.com/badge/github.com/ndlib/disadis)](https://goreportcard.com/report/github.com/ndlib/disadis)
-
-Disadis
-=======
 
 Disadis is an download proxy for Hydra-based applications.
 It will proxy content out of a Fedora 3 instance, so your Ruby application
