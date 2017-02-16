@@ -1,3 +1,8 @@
+[![APACHE 2
+License](http://img.shields.io/badge/APACHE2-license-blue.svg)](./LICENSE)
+[![Go Report
+Card](https://goreportcard.com/badge/github.com/ndlib/disadis)](https://goreportcard.com/report/github.com/ndlib/disadis)
+
 Disadis
 =======
 
