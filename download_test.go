@@ -34,6 +34,8 @@ func TestDownload(t *testing.T) {
 		{"GET", "/0123?datastream_id=content", 200, "hello"},
 		{"POST", "/0123", 404, ""},
 
+		{"GET", "/badsize", 200, "hola"},
+
 		// It applies the correct prefix
 		{"GET", "/xyz", 404, ""},
 		{"HEAD", "/xyz", 404, ""},
@@ -136,6 +138,7 @@ func setupHandler() *httptest.Server {
 	tf.Set("test:123", "content", fedora.DsInfo{}, []byte("goodbye"))
 	tf.Set("test:abc", "content", fedora.DsInfo{}, []byte("a longer string"))
 	tf.Set("another:xyz", "content", fedora.DsInfo{}, []byte("hola"))
+	tf.Set("test:badsize", "content", fedora.DsInfo{Size: "0"}, []byte("hola"))
 	tf.Set("test:redirect",
 		"content",
 		fedora.DsInfo{Location: "http://example.com/another/file",

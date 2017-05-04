@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -159,7 +160,6 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// set content-type from the datastream info instead of the returned header.
 	// (since if we redirect to bendo, we get bendo's content-type and bendo has no
 	// idea of what it should be)
-	w.Header().Set("Content-Type", info.Type)
 	w.Header().Set("Content-Type", dsinfo.MIMEType)
 	// This is set by ServeContent()
 	//w.Header().Set("Content-Length", info.Length)
@@ -167,10 +167,21 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private")
 	w.Header().Set("ETag", `"`+dsinfo.VersionID+`"`)
 
+	// Use the size returned from the content request in case we redirected
+	n, _ := strconv.ParseInt(info.Length, 10, 64)
+	if n <= 0 {
+		// We have no idea of the content length...
+		// so we don't support range requests or 206 responses
+		_, err = io.Copy(w, content)
+		if err != nil {
+			log.Println(err)
+		}
+		return
+	}
+
 	// use ServeContent and the StreamSeeker to handle range requests.
 	// when/if fedora ever supports range requests, this should be changed to
 	// pass the range through
-	n, _ := strconv.ParseInt(info.Length, 10, 64)
 	http.ServeContent(w, r, dsinfo.Label, time.Time{}, NewStreamSeeker(content, n))
 	return
 }

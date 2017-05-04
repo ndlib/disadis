@@ -99,6 +99,7 @@ type DsInfo struct {
 	MIMEType     string `xml:"dsMIME"`
 	Location     string `xml:"dsLocation"`
 	LocationType string `xml:"dsLocationType"`
+	Size         string `xml:"dsSize"`
 }
 
 func (rf *remoteFedora) GetDatastreamInfo(id, dsname string) (DsInfo, error) {
@@ -171,7 +172,7 @@ func (tf *TestFedora) GetDatastream(id, dsname string) (io.ReadCloser, ContentIn
 		return nil, ci, ErrNotFound
 	}
 	ci.Type = "text/plain"
-	ci.Length = fmt.Sprintf("%d", len(v.content))
+	ci.Length = v.info.Size
 	return ioutil.NopCloser(bytes.NewReader(v.content)), ci, nil
 }
 
@@ -198,6 +199,9 @@ func (tf *TestFedora) Set(id, dsname string, info DsInfo, value []byte) {
 	}
 	if info.LocationType == "" {
 		info.LocationType = "INTERNAL_ID"
+	}
+	if info.Size == "" {
+		info.Size = fmt.Sprintf("%d", len(value))
 	}
 	key := id + "/" + dsname
 	tf.data[key] = dsPair{info, value}
