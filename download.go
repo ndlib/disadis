@@ -86,10 +86,8 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var (
-		pid     = dh.Prefix + components[0] // sanitize pid somehow?
-		version = -1                        // -1 == current version
-	)
+	pid := dh.Prefix + components[0] // sanitize pid somehow?
+
 	// auth?
 	if dh.Auth != nil {
 		switch dh.Auth.Check(r, pid) {
@@ -109,17 +107,9 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// figure out versions
-	if len(components) == 2 && dh.Versioned {
-		var err error
-		version, err = strconv.Atoi(components[1])
-		if err != nil || version < 0 {
-			http.NotFound(w, r)
-			return
-		}
-	}
 
-	// always hit fedora for most recent version
+	// always hit fedora for most recent info
+	// Should this lookup be cached?
 	dsinfo, err := dh.Fedora.GetDatastreamInfo(pid, dh.Ds)
 	if err != nil {
 		log.Printf("Received Fedora error (%s,%s): %s", pid, dh.Ds, err.Error())
@@ -127,10 +117,31 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// does the version requested match the current version number?
-	if version >= 0 && version != dsinfo.Version() {
-		http.Error(w, "403 Forbidden", http.StatusForbidden)
-		return
+	// Figure out versions, if the feature is enabled.
+	// We only allow the download of the most recent version.
+	// If a version was not passed in the URL (i.e. len(components) == 1)
+	// then we take that to mean the most recent version and skip the check.
+	if len(components) == 2 && dh.Versioned {
+		version, err := strconv.Atoi(components[1])
+		if err != nil || version < 0 {
+			http.NotFound(w, r)
+			return
+		}
+		if version != dsinfo.Version() {
+			http.Error(w, "403 Forbidden", http.StatusForbidden)
+			return
+		}
+	}
+
+	// short circuit the e-tag check before trying to get content from the source
+	// This is simplistic to handle the common case early.
+	if haveEtag := r.Header.Get("If-None-Match"); haveEtag != "" {
+		etag := `"` + dsinfo.VersionID + `"`
+		if haveEtag == etag {
+			w.Header().Set("ETag", etag)
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
 	}
 
 	// return content
@@ -167,8 +178,11 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Use the size returned from the content request in case we redirected
 	n, _ := strconv.ParseInt(info.Length, 10, 64)
 	if n <= 0 {
+		if r.Method == "HEAD" {
+			return
+		}
 		// We have no idea of the content length...
-		// so we don't support range requests or 206 responses
+		// so we don't support range requests
 		_, err = io.Copy(w, content)
 		if err != nil {
 			log.Println(err)
@@ -180,5 +194,4 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// when/if fedora ever supports range requests, this should be changed to
 	// pass the range through
 	http.ServeContent(w, r, dsinfo.Label, time.Time{}, NewStreamSeeker(content, n))
-	return
 }
