@@ -65,10 +65,6 @@ type DownloadHandler struct {
 	Auth      *auth.HydraAuth
 }
 
-func notFound(w http.ResponseWriter) {
-	http.Error(w, "404 Not Found", http.StatusNotFound)
-}
-
 func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" && r.Method != "HEAD" {
 		w.Header().Set("Allow", "GET, HEAD")
@@ -86,7 +82,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// will an identifier ever have more than 64 characters?
 	if len(components[0]) == 0 || len(components[0]) > 64 {
-		notFound(w)
+		http.NotFound(w, r)
 		return
 	}
 
@@ -102,7 +98,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "401 Unauthorized", http.StatusUnauthorized)
 			return
 		case auth.AuthNotFound:
-			notFound(w)
+			http.NotFound(w, r)
 			return
 		case auth.AuthAllow:
 			break
@@ -118,7 +114,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		version, err = strconv.Atoi(components[1])
 		if err != nil || version < 0 {
-			notFound(w)
+			http.NotFound(w, r)
 			return
 		}
 	}
@@ -127,7 +123,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dsinfo, err := dh.Fedora.GetDatastreamInfo(pid, dh.Ds)
 	if err != nil {
 		log.Printf("Received Fedora error (%s,%s): %s", pid, dh.Ds, err.Error())
-		notFound(w)
+		http.NotFound(w, r)
 		return
 	}
 
@@ -144,7 +140,7 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch err {
 		case fedora.ErrNotFound:
-			notFound(w)
+			http.NotFound(w, r)
 			return
 		default:
 			log.Println("Received fedora error:", err)

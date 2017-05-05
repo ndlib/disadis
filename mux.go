@@ -54,7 +54,7 @@ func (dm *DsidMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if dm.DefaultHandler != nil {
 			dm.DefaultHandler.ServeHTTP(w, r)
 		} else {
-			notFound(w)
+			http.NotFound(w, r)
 		}
 		return
 	}
@@ -64,5 +64,5 @@ func (dm *DsidMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	notFound(w)
+	http.NotFound(w, r)
 }
