@@ -71,7 +71,8 @@ func notFound(w http.ResponseWriter) {
 
 func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" && r.Method != "HEAD" {
-		notFound(w)
+		w.Header().Set("Allow", "GET, HEAD")
+		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
