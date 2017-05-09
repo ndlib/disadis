@@ -32,7 +32,7 @@ func TestDownload(t *testing.T) {
 		{"HEAD", "/123/0", 200, ""},
 
 		{"GET", "/0123?datastream_id=content", 200, "hello"},
-		{"POST", "/0123", 404, ""},
+		{"POST", "/0123", 405, ""},
 
 		{"GET", "/badsize", 200, "hola"},
 
