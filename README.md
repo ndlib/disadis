@@ -47,11 +47,12 @@ The file gives how to determine the current user from a request, the handlers to
 set up, and the URL to use to address fedora.
 
 The configuration file consists of a number of sections, which may appear in any order.
-The first section `[general]` has two variables to set:
+The first section `[general]` has three variables to set:
 
  * `log-filename` is the name of the log file to use. If none is provided, logging is sent to `stdout`.
  * `fedora-addr` is the root URL to use to access your fedora instance.
  It should include the fedora username and password if those are needed to download content from your fedora.
+* `bendo-token` is a token to use for content stored at external URLs via E or R datastreams. (optional)
 
 Sample section:
 
