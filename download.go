@@ -184,6 +184,17 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	w.Header().Set("Cache-Control", "private")
 	w.Header().Set("ETag", `"`+dsinfo.VersionID+`"`)
+	if info.MD5 == "" && dsinfo.Checksum != "" {
+		// If we did not get a checksum from the content supplier,
+		// use the MD5 checksum in the fedora metadata, if any
+		info.MD5 = dsinfo.Checksum
+	}
+	if info.MD5 != "" {
+		w.Header().Set("Content-Md5", info.MD5)
+	}
+	if info.SHA256 != "" {
+		w.Header().Set("Content-Sha256", info.SHA256)
+	}
 
 	// Use the size returned from the content request in case we redirected
 	n, _ := strconv.ParseInt(info.Length, 10, 64)
@@ -233,5 +244,7 @@ func getBendoContent(url, token string) (io.ReadCloser, fedora.ContentInfo, erro
 	info.Type = r.Header.Get("Content-Type")
 	info.Length = r.Header.Get("Content-Length")
 	info.Disposition = r.Header.Get("Content-Disposition")
+	info.MD5 = r.Header.Get("X-Content-Md5")
+	info.SHA256 = r.Header.Get("X-Content-Sha256")
 	return r.Body, info, nil
 }

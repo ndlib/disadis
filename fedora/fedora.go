@@ -38,6 +38,8 @@ type ContentInfo struct {
 	Type        string
 	Length      string
 	Disposition string
+	MD5         string // as hex string
+	SHA256      string // as hex string
 }
 
 // NewRemote creates a reference to a remote Fedora repository.
@@ -124,6 +126,10 @@ func (rf *remoteFedora) GetDatastreamInfo(id, dsname string) (DsInfo, error) {
 	dec := xml.NewDecoder(r.Body)
 	err = dec.Decode(&info)
 	r.Body.Close()
+	// Why must fedora return "none" when there is no checksum??
+	if info.Checksum == "none" {
+		info.Checksum = ""
+	}
 	return info, err
 }
 
