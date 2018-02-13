@@ -70,6 +70,26 @@ func TestDLTP568(t *testing.T) {
 	}
 }
 
+// Check that redirects use the token, if supplied
+func TestRedirectToken(t *testing.T) {
+	ts := setupHandler()
+	defer ts.Close()
+
+	checkRoute(t, "GET", ts.URL+"/remote", 200, "")
+
+	// make token invalid
+	// and see if we get an unquthorized error.
+	// this is dirty, but it is just a test.
+	ts.Config.Handler.(*DownloadHandler).BendoToken = "abc"
+	checkRoute(t, "GET", ts.URL+"/remote", 500, "")
+
+	// remove token config
+	// and see if we get the fedora response
+	// this is dirty, but it is just a test.
+	ts.Config.Handler.(*DownloadHandler).BendoToken = ""
+	checkRoute(t, "GET", ts.URL+"/remote", 200, "from fedora")
+}
+
 func checkContentType(t *testing.T, verb, route string, status int, expectedType string) {
 	r, _ := checkRouteX(t, verb, route, status, "", nil)
 	recvType := r.Header.Get("Content-Type")
@@ -131,6 +151,32 @@ func TestRangeRequest(t *testing.T) {
 	})
 }
 
+// An AuthTarget is a simple handler that returns 200 if
+// a correct token is provided in the X-Api-Key header.
+// Otherwise, a 401 is returned.
+type AuthTarget struct {
+	Tokens []string
+}
+
+func (t *AuthTarget) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	goal := r.Header.Get("X-Api-Key")
+	// token in list?
+	for _, token := range t.Tokens {
+		if goal == token {
+			return
+		}
+	}
+	w.WriteHeader(http.StatusUnauthorized)
+}
+
+var BendoServer *httptest.Server
+
+func init() {
+	BendoServer = httptest.NewServer(&AuthTarget{
+		Tokens: []string{"12345"},
+	})
+}
+
 // setupHandler returns a test server seeded with some content.
 func setupHandler() *httptest.Server {
 	tf := fedora.NewTestFedora()
@@ -141,15 +187,25 @@ func setupHandler() *httptest.Server {
 	tf.Set("test:badsize", "content", fedora.DsInfo{Size: "0"}, []byte("hola"))
 	tf.Set("test:redirect",
 		"content",
-		fedora.DsInfo{Location: "http://example.com/another/file",
+		fedora.DsInfo{
+			Location:     BendoServer.URL + "/another/file",
 			LocationType: "URL",
 			MIMEType:     "audio/mpeg"},
 		[]byte("audio stream")) // for DLTP-568
+	tf.Set("test:remote",
+		"content",
+		fedora.DsInfo{
+			Location:     BendoServer.URL + "/test",
+			LocationType: "URL",
+			MIMEType:     "image/png",
+		},
+		[]byte("from fedora"))
 	h := &DownloadHandler{
-		Fedora:    tf,
-		Ds:        "content",
-		Versioned: true,
-		Prefix:    "test:",
+		Fedora:     tf,
+		Ds:         "content",
+		Versioned:  true,
+		Prefix:     "test:",
+		BendoToken: "12345",
 	}
 	return httptest.NewServer(h)
 }
