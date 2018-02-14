@@ -86,6 +86,7 @@ type config struct {
 		Log_filename string
 		Fedora_addr  string
 		Admin        []string
+		Bendo_token  string
 	}
 	Pubtkt struct {
 		Key_file string
@@ -171,6 +172,9 @@ func main() {
 	default:
 		log.Printf("Warning: No authorization method given.")
 	}
+	if config.General.Bendo_token != "" {
+		log.Println("Bendo token supplied")
+	}
 	if len(config.Handler) == 0 {
 		log.Printf("No Handlers are defined. Exiting.")
 		return
@@ -195,10 +199,11 @@ func runHandlers(config config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 	// first create the handlers
 	for k, v := range config.Handler {
 		h := &DownloadHandler{
-			Fedora:    fedora,
-			Ds:        v.Datastream,
-			Versioned: v.Versioned,
-			Prefix:    v.Prefix,
+			Fedora:     fedora,
+			Ds:         v.Datastream,
+			Versioned:  v.Versioned,
+			Prefix:     v.Prefix,
+			BendoToken: config.General.Bendo_token,
 		}
 		if v.Auth {
 			h.Auth = auth

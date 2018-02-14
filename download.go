@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -58,11 +59,12 @@ import (
 //	http.Handle("/d/", http.StripPrefix("/d/", dh))
 //	return http.ListenAndServe(":"+port, nil)
 type DownloadHandler struct {
-	Fedora    fedora.Fedora
-	Ds        string
-	Versioned bool
-	Prefix    string
-	Auth      *auth.HydraAuth
+	Fedora     fedora.Fedora   // connection to fedora
+	Ds         string          // the datastream to proxy
+	Versioned  bool            // True if we support versioned paths
+	Prefix     string          // the PID prefix to use, needs colon
+	Auth       *auth.HydraAuth // kept for vecnet
+	BendoToken string          // optional, used for 'E' and 'R' datastreams
 }
 
 func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -145,9 +147,17 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// return content
-	// TODO(dbrower): should we see if the dsinfo.LocationType is "URL"?
-	// then we don't need to hit fedora just to get a redirect.
-	content, info, err := dh.Fedora.GetDatastream(pid, dh.Ds)
+	var content io.ReadCloser
+	var info fedora.ContentInfo
+	if dh.BendoToken != "" && dsinfo.LocationType == "URL" {
+		// this datastream is stored outside of fedora
+		// Get the content directly. This way we can supply the auth headers
+		// directly to the content supplier.
+		content, info, err = getBendoContent(dsinfo.Location, dh.BendoToken)
+	} else {
+		// get the content from fedora
+		content, info, err = dh.Fedora.GetDatastream(pid, dh.Ds)
+	}
 	if err != nil {
 		switch err {
 		case fedora.ErrNotFound:
@@ -194,4 +204,34 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// when/if fedora ever supports range requests, this should be changed to
 	// pass the range through
 	http.ServeContent(w, r, dsinfo.Label, time.Time{}, NewStreamSeeker(content, n))
+}
+
+// returns the contents of the given URL
+// The returned stream needs to be closed when finished.
+func getBendoContent(url, token string) (io.ReadCloser, fedora.ContentInfo, error) {
+	var info fedora.ContentInfo
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, info, err
+	}
+	req.Header.Add("X-Api-Key", token)
+	r, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, info, err
+	}
+	if r.StatusCode != 200 {
+		r.Body.Close()
+		switch r.StatusCode {
+		case 404:
+			return nil, info, fedora.ErrNotFound
+		case 401:
+			return nil, info, fedora.ErrNotAuthorized
+		default:
+			return nil, info, fmt.Errorf("Received status %d from bendo", r.StatusCode)
+		}
+	}
+	info.Type = r.Header.Get("Content-Type")
+	info.Length = r.Header.Get("Content-Length")
+	info.Disposition = r.Header.Get("Content-Disposition")
+	return r.Body, info, nil
 }
