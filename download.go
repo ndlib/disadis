@@ -59,16 +59,16 @@ import (
 //	http.Handle("/d/", http.StripPrefix("/d/", dh))
 //	return http.ListenAndServe(":"+port, nil)
 type DownloadHandler struct {
-	Fedora     fedora.Fedora   // connection to fedora
-	Ds         string          // the datastream to proxy
-	Versioned  bool            // True if we support versioned paths
-	Prefix     string          // the PID prefix to use, needs colon
-	Auth       *auth.HydraAuth // kept for vecnet
-	BendoToken string          // optional, used for 'E' and 'R' datastreams
-	Aws_access_key string      // AWS KEY for S3 bucket access
-        Aws_secret_access_key  string //SECRET for AWS S3 key
-        Aws_region string          // AWS region 
-	Aws_s3_bucket_subdir string // format s3:/bucketname/bucket_subdir
+	Fedora                fedora.Fedora   // connection to fedora
+	Ds                    string          // the datastream to proxy
+	Versioned             bool            // True if we support versioned paths
+	Prefix                string          // the PID prefix to use, needs colon
+	Auth                  *auth.HydraAuth // kept for vecnet
+	BendoToken            string          // optional, used for 'E' and 'R' datastreams
+	Aws_access_key        string          // AWS KEY for S3 bucket access
+	Aws_secret_access_key string          //SECRET for AWS S3 key
+	Aws_region            string          // AWS region
+	Aws_s3_bucket_subdir  string          // format s3:/bucketname/bucket_subdir
 }
 
 func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

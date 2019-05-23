@@ -83,14 +83,14 @@ func signalHandler(sig <-chan os.Signal, logw reopener) {
 // the structure of our configuration file.
 type config struct {
 	General struct {
-		Log_filename string
-		Fedora_addr  string
-		Admin        []string
-		Bendo_token  string
-		Aws_access_key string
+		Log_filename          string
+		Fedora_addr           string
+		Admin                 []string
+		Bendo_token           string
+		Aws_access_key        string
 		Aws_secret_access_key string
-		Aws_region string
-		Aws_s3_bucket_subdir string
+		Aws_region            string
+		Aws_s3_bucket_subdir  string
 	}
 	Pubtkt struct {
 		Key_file string
@@ -203,14 +203,14 @@ func runHandlers(config config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 	// first create the handlers
 	for k, v := range config.Handler {
 		h := &DownloadHandler{
-			Fedora:     fedora,
-			Ds:         v.Datastream,
-			Versioned:  v.Versioned,
-			Prefix:     v.Prefix,
-			BendoToken: config.General.Bendo_token,
-			Aws_access_key:  config.General.Aws_access_key,
-			Aws_secret_access_key:  config.General.Aws_secret_access_key,
-			Aws_region:  config.General.Aws_region,
+			Fedora:                fedora,
+			Ds:                    v.Datastream,
+			Versioned:             v.Versioned,
+			Prefix:                v.Prefix,
+			BendoToken:            config.General.Bendo_token,
+			Aws_access_key:        config.General.Aws_access_key,
+			Aws_secret_access_key: config.General.Aws_secret_access_key,
+			Aws_region:            config.General.Aws_region,
 			Aws_s3_bucket_subdir:  config.General.Aws_s3_bucket_subdir,
 		}
 		if v.Auth {
