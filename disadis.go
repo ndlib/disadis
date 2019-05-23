@@ -87,6 +87,10 @@ type config struct {
 		Fedora_addr  string
 		Admin        []string
 		Bendo_token  string
+		Aws_access_key string
+		Aws_secret_access_key string
+		Aws_region string
+		Aws_s3_bucket_subdir string
 	}
 	Pubtkt struct {
 		Key_file string
@@ -204,6 +208,10 @@ func runHandlers(config config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 			Versioned:  v.Versioned,
 			Prefix:     v.Prefix,
 			BendoToken: config.General.Bendo_token,
+			Aws_access_key:  config.General.Aws_access_key,
+			Aws_secret_access_key:  config.General.Aws_secret_access_key,
+			Aws_region:  config.General.Aws_region,
+			Aws_s3_bucket_subdir:  config.General.Aws_s3_bucket_subdir,
 		}
 		if v.Auth {
 			h.Auth = auth
