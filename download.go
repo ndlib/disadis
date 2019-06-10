@@ -1,6 +1,8 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -17,23 +19,16 @@ import (
 //
 //	GET	/:id
 //	HEAD	/:id
+//      GET    /:id/zip/id1,id2,id3
 //
-// And, if Versioned is true, the routes
 //
-//	GET	/:id/:version
-//	HEAD	/:id/:version
-//
-// The first routes will return current version of the contents of the
+// The first routes will return the contents of the
 // datastream named Ds.
-// The second group will either return the current version of the contents of
-// Ds, provided the current version is equal to :version. Otherwise,
-// a 403 Error is returned.
 //
 // If Auth is not nil, the object with the given identifier is passed
 // to Auth, which may either return an error, a redirect, or nothing.
 // If nothing is returned, the contents are passed back.
-// The Auth handling is done after the identifier is decoded, but before
-// the version check, if any.
+// The Auth handling is done after the identifier is decoded
 //
 // The reason the Handler calls Auth directly, instead of presuming
 // the auth handler has wrapped this one, is because this handler knows
@@ -61,7 +56,6 @@ import (
 type DownloadHandler struct {
 	Fedora     fedora.Fedora   // connection to fedora
 	Ds         string          // the datastream to proxy
-	Versioned  bool            // True if we support versioned paths
 	Prefix     string          // the PID prefix to use, needs colon
 	Auth       *auth.HydraAuth // kept for vecnet
 	BendoToken string          // optional, used for 'E' and 'R' datastreams
@@ -74,13 +68,10 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// "" / "id" ( / :version )?
-	// :version may contain slashes, if there are more slashes in the url.
-	// this way we can verify IIIF requests (which have lots of slashes) easily
 	path := strings.TrimPrefix(r.URL.Path, "/")
 	path = strings.TrimSuffix(path, "/")
-	// will always return a string of length 1 or 2
-	components := strings.SplitN(path, "/", 2)
+	// should always return a string of length 1 or 3
+	components := strings.SplitN(path, "/", 3)
 
 	// will an identifier ever have more than 64 characters?
 	if len(components[0]) == 0 || len(components[0]) > 64 {
@@ -110,6 +101,23 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	//Valid routes are /:id and /:id/zip/:id1,:id2,...idn
+	//return MethodNotAllowed for others
+	if len(components) == 1 {
+		downloadSingleFile(dh, pid, w, r)
+	}
+	if len(components) == 3 && components[1] == "zip" {
+		downloadZip(dh, pid, w, r, components[2])
+	} else {
+		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+}
+
+// private method that downloads content for given pid.
+// works with both inline content in fedora, or indirect content from bendo
+func downloadSingleFile(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http.Request) {
 	// always hit fedora for most recent info
 	// Should this lookup be cached?
 	dsinfo, err := dh.Fedora.GetDatastreamInfo(pid, dh.Ds)
@@ -117,22 +125,6 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received Fedora error (%s,%s): %s", pid, dh.Ds, err.Error())
 		http.NotFound(w, r)
 		return
-	}
-
-	// Figure out versions, if the feature is enabled.
-	// We only allow the download of the most recent version.
-	// If a version was not passed in the URL (i.e. len(components) == 1)
-	// then we take that to mean the most recent version and skip the check.
-	if len(components) == 2 && dh.Versioned {
-		version, err := strconv.Atoi(components[1])
-		if err != nil || version < 0 {
-			http.NotFound(w, r)
-			return
-		}
-		if version != dsinfo.Version() {
-			http.Error(w, "403 Forbidden", http.StatusForbidden)
-			return
-		}
 	}
 
 	// short circuit the e-tag check before trying to get content from the source
@@ -215,6 +207,94 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// when/if fedora ever supports range requests, this should be changed to
 	// pass the range through
 	http.ServeContent(w, r, dsinfo.Label, time.Time{}, NewStreamSeeker(content, n))
+}
+
+// assuming route /:pid1/zip/:pid2,:pid3..n
+// return zip file named pid1.zip containing files for pid1 , pid2, ...pid3
+func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http.Request, pidlist string) {
+
+	// For the time being, nosupport of HEAD requests
+	if r.Method == "HEAD" {
+		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// expect  a list of pids
+	pids := strings.Split(pidlist, ",")
+
+	zipBuffer := new(bytes.Buffer)
+	zipWriter := zip.NewWriter(zipBuffer)
+	defer zipWriter.Close()
+
+	// for each pid in list
+	// retrieved content from fedora or bendo
+	// write to zip stream
+	for _, this_pid := range pids {
+		// Get Fedora Info
+		dsinfo, err := dh.Fedora.GetDatastreamInfo(dh.Prefix+this_pid, dh.Ds)
+		if err != nil {
+			log.Printf("Received Fedora error (%s,%s): %s", pid, dh.Ds, err.Error())
+			http.NotFound(w, r)
+			return
+		}
+
+		// return content
+		var content io.ReadCloser
+		var contentBuff bytes.Buffer
+
+		fmt.Printf("this_pid=%s\n", this_pid)
+		if dh.BendoToken != "" && dsinfo.LocationType == "URL" {
+			// this datastream is stored outside of fedora
+			// Get the content directly. This way we can supply the auth headers
+			// directly to the content supplier.
+			content, _, err = getBendoContent(dsinfo.Location, dh.BendoToken)
+			defer content.Close()
+		} else {
+			// get the content from fedora
+			content, _, err = dh.Fedora.GetDatastream(dh.Prefix+this_pid, dh.Ds)
+			defer content.Close()
+		}
+		if err != nil {
+			switch err {
+			case fedora.ErrNotFound:
+				http.NotFound(w, r)
+				return
+			default:
+				log.Println("Received fedora error:", err)
+				http.Error(w, "500 Internal Error", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		zip_filep, err := zipWriter.Create(dsinfo.Label)
+		if err != nil {
+			log.Println("Received fedora error:", err)
+			http.Error(w, "500 Internal Error", http.StatusInternalServerError)
+			return
+		}
+		contentBuff.ReadFrom(content)
+		// Add the File to the gzip stream
+		_, err2 := zip_filep.Write(contentBuff.Bytes())
+		if err2 != nil {
+			log.Println("Received zipWriter zipWriter error:", err)
+			http.Error(w, "500 Internal Error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	zipWriter.Close()
+
+	// Set the content
+	w.Header().Set("Content-Disposition", `inline; filename="`+pid+`.zip"`)
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Transfer-Encoding", "binary")
+	w.Header().Set("Cache-Control", "private")
+
+	// use ServeContent and the StreamSeeker to handle range requests.
+	// when/if fedora ever supports range requests, this should be changed to
+	// pass the range through
+	//  http.ServeContent(w, r, pid+".gzip", time.Time{}, NewStreamSeeker(content, n))
+	zipBuffer.WriteTo(w)
 }
 
 // returns the contents of the given URL
