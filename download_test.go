@@ -21,15 +21,9 @@ func TestDownload(t *testing.T) {
 		// Test pool list and creation
 		{"GET", "/0123", 200, "hello"},
 		{"HEAD", "/0123", 200, ""},
-		{"GET", "/0123/0", 200, "hello"},
-		{"GET", "/0123/1", 403, ""},
-		{"HEAD", "/0123/0", 200, ""},
 
 		{"GET", "/123", 200, "goodbye"},
 		{"HEAD", "/123", 200, ""},
-		{"GET", "/123/0", 200, "goodbye"},
-		{"GET", "/123/1", 403, ""},
-		{"HEAD", "/123/0", 200, ""},
 
 		{"GET", "/0123?datastream_id=content", 200, "hello"},
 		{"POST", "/0123", 405, ""},
@@ -39,12 +33,11 @@ func TestDownload(t *testing.T) {
 		// It applies the correct prefix
 		{"GET", "/xyz", 404, ""},
 		{"HEAD", "/xyz", 404, ""},
-		{"GET", "/xyz/0", 404, ""},
-		{"GET", "/xyz/1", 404, ""},
-		{"HEAD", "/xyz/0", 404, ""},
 
 		// identifiers are assumed to not have more than 64 characters
 		{"GET", "/123456789012345678901234567890123456789012345678901234567890", 404, ""},
+
+		{"GET",  "/123/
 	}
 	for _, s := range sequence {
 		checkRoute(t, s.verb, ts.URL+s.route, s.status, s.expected)
@@ -203,7 +196,6 @@ func setupHandler() *httptest.Server {
 	h := &DownloadHandler{
 		Fedora:     tf,
 		Ds:         "content",
-		Versioned:  true,
 		Prefix:     "test:",
 		BendoToken: "12345",
 	}

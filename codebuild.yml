@@ -2,7 +2,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
 
-Description: 'CodeBuild disadis from GitHub to S3 using hesburghlibraries/noids-buildimage'
+Description: 'CodeBuild disadis from GitHub to S3 using ndlib/noids-builder'
 
 
 Metadata:
@@ -98,7 +98,7 @@ Resources:
   Project:
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: noids
+      Name: !Sub ${AWS::StackName}-RPMBuilder
       Description: 'disadis from GitHub to S3 rpm'
       ServiceRole: !If [NoCodeBuildRole, !ImportValue 'codebuild:role', !Ref CodeBuildRole]
       TimeoutInMinutes: 5
@@ -113,5 +113,5 @@ Resources:
       Environment:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL
-        Image: hesburghlibraries/disadis-buildimage
+        Image: ndlib/noids-builder
 ...

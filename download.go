@@ -103,13 +103,13 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	//Valid routes are /:id and /:id/zip/:id1,:id2,...idn
 	//return MethodNotAllowed for others
-	if len(components) == 1 {
+	switch {
+ 	  case len(components) == 1:
 		downloadSingleFile(dh, pid, w, r)
-	}
-	if len(components) == 3 && components[1] == "zip" {
+   	  case len(components) == 3 && components[1] == "zip":
 		downloadZip(dh, pid, w, r, components[2])
-	} else {
-		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+	  default:
+		http.NotFound(w,r)
 		return
 	}
 
@@ -242,7 +242,6 @@ func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http
 		var content io.ReadCloser
 		var contentBuff bytes.Buffer
 
-		fmt.Printf("this_pid=%s\n", this_pid)
 		if dh.BendoToken != "" && dsinfo.LocationType == "URL" {
 			// this datastream is stored outside of fedora
 			// Get the content directly. This way we can supply the auth headers
@@ -281,8 +280,6 @@ func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http
 			return
 		}
 	}
-
-	zipWriter.Close()
 
 	// Set the content
 	w.Header().Set("Content-Disposition", `inline; filename="`+pid+`.zip"`)
