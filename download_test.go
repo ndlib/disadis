@@ -37,7 +37,6 @@ func TestDownload(t *testing.T) {
 		// identifiers are assumed to not have more than 64 characters
 		{"GET", "/123456789012345678901234567890123456789012345678901234567890", 404, ""},
 
-		{"GET",  "/123/
 	}
 	for _, s := range sequence {
 		checkRoute(t, s.verb, ts.URL+s.route, s.status, s.expected)
