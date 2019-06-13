@@ -94,7 +94,6 @@ type config struct {
 	Handler map[string]*struct {
 		Port          string
 		Auth          bool
-		Versioned     bool
 		Prefix        string
 		Datastream    string
 		Datastream_id []string
@@ -201,7 +200,6 @@ func runHandlers(config config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 		h := &DownloadHandler{
 			Fedora:     fedora,
 			Ds:         v.Datastream,
-			Versioned:  v.Versioned,
 			Prefix:     v.Prefix,
 			BendoToken: config.General.Bendo_token,
 		}
