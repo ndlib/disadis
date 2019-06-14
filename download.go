@@ -104,12 +104,12 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//Valid routes are /:id and /:id/zip/:id1,:id2,...idn
 	//return MethodNotAllowed for others
 	switch {
- 	  case len(components) == 1:
+	case len(components) == 1:
 		downloadSingleFile(dh, pid, w, r)
-   	  case len(components) == 3 && components[1] == "zip":
+	case len(components) == 3 && components[1] == "zip":
 		downloadZip(dh, pid, w, r, components[2])
-	  default:
-		http.NotFound(w,r)
+	default:
+		http.NotFound(w, r)
 		return
 	}
 
@@ -222,10 +222,14 @@ func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http
 	// expect  a list of pids
 	pids := strings.Split(pidlist, ",")
 
-	zipBuffer := new(bytes.Buffer)
-	zipWriter := zip.NewWriter(zipBuffer)
+	zipWriter := zip.NewWriter(w)
 	defer zipWriter.Close()
 
+	// Set the content
+	w.Header().Set("Content-Disposition", `inline; filename="`+pid+`.zip"`)
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Transfer-Encoding", "binary")
+	w.Header().Set("Cache-Control", "private")
 	// for each pid in list
 	// retrieved content from fedora or bendo
 	// write to zip stream
@@ -279,19 +283,13 @@ func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http
 			http.Error(w, "500 Internal Error", http.StatusInternalServerError)
 			return
 		}
-	}
 
-	// Set the content
-	w.Header().Set("Content-Disposition", `inline; filename="`+pid+`.zip"`)
-	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Transfer-Encoding", "binary")
-	w.Header().Set("Cache-Control", "private")
+	}
 
 	// use ServeContent and the StreamSeeker to handle range requests.
 	// when/if fedora ever supports range requests, this should be changed to
 	// pass the range through
 	//  http.ServeContent(w, r, pid+".gzip", time.Time{}, NewStreamSeeker(content, n))
-	zipBuffer.WriteTo(w)
 }
 
 // returns the contents of the given URL
