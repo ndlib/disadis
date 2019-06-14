@@ -30,13 +30,15 @@ func TestDownload(t *testing.T) {
 
 		{"GET", "/badsize", 200, "hola"},
 
+		{"GET", "/0123/zip/123,0123", 200, ""},
+		{"GET", "/0123/zip/123,0124", 404, ""},
+
 		// It applies the correct prefix
 		{"GET", "/xyz", 404, ""},
 		{"HEAD", "/xyz", 404, ""},
 
 		// identifiers are assumed to not have more than 64 characters
 		{"GET", "/123456789012345678901234567890123456789012345678901234567890", 404, ""},
-
 	}
 	for _, s := range sequence {
 		checkRoute(t, s.verb, ts.URL+s.route, s.status, s.expected)
