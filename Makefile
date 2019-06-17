@@ -26,4 +26,4 @@ rpm: disadis
 	                --description "disadis daemon" \
 	                --rpm-user app \
 	                --rpm-group app \
-			noids=/opt/disadis/bin/disadis
+			disadis=/opt/disadis/bin/disadis
