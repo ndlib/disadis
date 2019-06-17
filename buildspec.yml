@@ -9,7 +9,7 @@ phases:
           golang: 1.12
     commands:
       - apt-get -y install make rpm
-      - gem install --no-ri --no-rdoc fpm
+      - gem install --no-document
 
   build:
     commands:
