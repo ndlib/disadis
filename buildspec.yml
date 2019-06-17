@@ -3,9 +3,12 @@ version: 0.2
 
 
 phases:
+  runtime-versions:
+          ruby: 2.6
+          golang: 1.12
   install:
     commands:
-      - apt-get -y install ruby ruby-dev build-essential
+      - apt-get -y make
       - gem install --no-ri --no-rdoc fpm
 
   build:
