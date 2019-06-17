@@ -2,7 +2,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
 
-Description: 'CodeBuild disadis from GitHub to S3 using ndlib/noids-builder'
+Description: 'CodeBuild disadis from GitHub to S3 using aws/codebuild/standrard
 
 
 Metadata:
@@ -107,11 +107,11 @@ Resources:
         Type: S3
         Packaging: NONE
         NamespaceType: NONE
-        Path: noids
+        Path: disadis
         Name: rpms
         Location: !If [NoBucket, !Ref Bucket, !Ref TargetBucket]
       Environment:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL
-        Image: ndlib/noids-builder
+        Image: aws/codebuild/standard:2.0
 ...
