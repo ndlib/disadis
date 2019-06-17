@@ -3,14 +3,6 @@ version: 0.2
 
 
 phases:
-  install:
-    runtime-versions:
-          ruby: 2.6
-          golang: 1.12
-    commands:
-      - apt-get -y install make rpm
-      - gem install --no-document fpm
-
   build:
     commands:
       - mkdir -p /go/src/github.com/ndlib
