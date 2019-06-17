@@ -2,7 +2,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
 
-Description: 'CodeBuild disadis from GitHub to S3 using aws/codebuild/standrard
+Description: 'CodeBuild disadis from GitHub to S3 using aws/codebuild/standrard'
 
 
 Metadata:
