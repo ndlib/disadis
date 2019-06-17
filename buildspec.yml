@@ -8,7 +8,7 @@ phases:
           ruby: 2.6
           golang: 1.12
     commands:
-      - apt-get -y install make rpmbuild
+      - apt-get -y install make rpm
       - gem install --no-ri --no-rdoc fpm
 
   build:
