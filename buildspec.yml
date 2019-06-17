@@ -5,7 +5,7 @@ version: 0.2
 phases:
   install:
     commands:
-      - apt-get install ruby ruby-dev ruby-gems build-essential
+      - apt-get install ruby ruby-dev build-essential
       - gem install --no-ri --no-rdoc fpm
 
   build:
