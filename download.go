@@ -103,17 +103,16 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	//Valid routes are /:id (sindle file download) 
+	//Valid routes are /:id (single file download) 
 	//and /:id/zip/:id1,:id2,...idn (zip of all files associated with :id
 	//return MethodNotAllowed for others
-	if len(components) == 1 {
-		downloadSingleFile(dh, pid, w, r)
-	}
-	if len(components) == 3 && components[1] == "zip" {
-		downloadZip(dh, pid, w, r, components[2])
-	} else {
-		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
-		return
+	switch {
+		case len(components) == 1:
+			downloadSingleFile(dh, pid, w, r)
+		case len(components) == 3 && components[1] == "zip":
+			downloadZip(dh, pid, w, r, components[2])
+		default:
+			http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 	}
 
 }
@@ -214,7 +213,7 @@ func downloadSingleFile(dh *DownloadHandler, pid string, w http.ResponseWriter, 
 
 // assuming route /:pid1/zip/:pid2,:pid3..n
 // return zip file named pid1.zip containing files for pid1 , pid2, ...pid3
-// Not that we are actually streaming the zipfile back to the http responsewriter
+// Now that we are actually streaming the zipfile back to the http responsewriter
 // as it is being written, to avoid having to buffer a large file on the local disadis machine
 
 func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http.Request, pidlist string) {
@@ -287,7 +286,7 @@ func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http
 		// Stream the file conetent from the content ReadCloser to the ZipFile Writer
 		_, err2 := io.Copy(zip_filep, content)
 		if err2 != nil {
-			log.Println("Received zipFile io.Copy error:", err)
+			log.Println("Received zipFile io.Copy error:", err2)
 			http.Error(w, "500 Internal Error", http.StatusInternalServerError)
 			return
 		}
