@@ -2,7 +2,6 @@ package main
 
 import (
 	"archive/zip"
-	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -61,6 +60,9 @@ type DownloadHandler struct {
 	BendoToken string          // optional, used for 'E' and 'R' datastreams
 }
 
+// The generic HTTP handler - parses the routes, does authorization,
+// and calls the route-specific sub-handlers
+
 func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" && r.Method != "HEAD" {
 		w.Header().Set("Allow", "GET, HEAD")
@@ -101,7 +103,8 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	//Valid routes are /:id and /:id/zip/:id1,:id2,...idn
+	//Valid routes are /:id (sindle file download) 
+	//and /:id/zip/:id1,:id2,...idn (zip of all files associated with :id
 	//return MethodNotAllowed for others
 	if len(components) == 1 {
 		downloadSingleFile(dh, pid, w, r)
@@ -211,6 +214,9 @@ func downloadSingleFile(dh *DownloadHandler, pid string, w http.ResponseWriter, 
 
 // assuming route /:pid1/zip/:pid2,:pid3..n
 // return zip file named pid1.zip containing files for pid1 , pid2, ...pid3
+// Not that we are actually streaming the zipfile back to the http responsewriter
+// as it is being written, to avoid having to buffer a large file on the local disadis machine
+
 func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http.Request, pidlist string) {
 
 	// For the time being, nosupport of HEAD requests
@@ -222,9 +228,17 @@ func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http
 	// expect  a list of pids
 	pids := strings.Split(pidlist, ",")
 
-	zipBuffer := new(bytes.Buffer)
-	zipWriter := zip.NewWriter(zipBuffer)
+	// open the zip file stream- write straight the httpResponseWriter
+
+	zipWriter := zip.NewWriter(w)
 	defer zipWriter.Close()
+
+
+	// Set the content tobe a zip file before we write anything
+	w.Header().Set("Content-Disposition", `inline; filename="`+pid+`.zip"`)
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Transfer-Encoding", "binary")
+	w.Header().Set("Cache-Control", "private")
 
 	// for each pid in list
 	// retrieved content from fedora or bendo
@@ -240,9 +254,7 @@ func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http
 
 		// return content
 		var content io.ReadCloser
-		var contentBuff bytes.Buffer
 
-		fmt.Printf("this_pid=%s\n", this_pid)
 		if dh.BendoToken != "" && dsinfo.LocationType == "URL" {
 			// this datastream is stored outside of fedora
 			// Get the content directly. This way we can supply the auth headers
@@ -272,29 +284,14 @@ func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http
 			http.Error(w, "500 Internal Error", http.StatusInternalServerError)
 			return
 		}
-		contentBuff.ReadFrom(content)
-		// Add the File to the gzip stream
-		_, err2 := zip_filep.Write(contentBuff.Bytes())
+		// Stream the file conetent from the content ReadCloser to the ZipFile Writer
+		_, err2 := io.Copy(zip_filep, content)
 		if err2 != nil {
-			log.Println("Received zipWriter zipWriter error:", err)
+			log.Println("Received zipFile io.Copy error:", err)
 			http.Error(w, "500 Internal Error", http.StatusInternalServerError)
 			return
 		}
 	}
-
-	zipWriter.Close()
-
-	// Set the content
-	w.Header().Set("Content-Disposition", `inline; filename="`+pid+`.zip"`)
-	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Transfer-Encoding", "binary")
-	w.Header().Set("Cache-Control", "private")
-
-	// use ServeContent and the StreamSeeker to handle range requests.
-	// when/if fedora ever supports range requests, this should be changed to
-	// pass the range through
-	//  http.ServeContent(w, r, pid+".gzip", time.Time{}, NewStreamSeeker(content, n))
-	zipBuffer.WriteTo(w)
 }
 
 // returns the contents of the given URL
