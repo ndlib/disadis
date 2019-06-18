@@ -103,16 +103,16 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	//Valid routes are /:id (single file download) 
+	//Valid routes are /:id (single file download)
 	//and /:id/zip/:id1,:id2,...idn (zip of all files associated with :id
 	//return MethodNotAllowed for others
 	switch {
-		case len(components) == 1:
-			downloadSingleFile(dh, pid, w, r)
-		case len(components) == 3 && components[1] == "zip":
-			downloadZip(dh, pid, w, r, components[2])
-		default:
-			http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+	case len(components) == 1:
+		downloadSingleFile(dh, pid, w, r)
+	case len(components) == 3 && components[1] == "zip":
+		downloadZip(dh, pid, w, r, components[2])
+	default:
+		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 	}
 
 }
@@ -226,12 +226,11 @@ func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http
 
 	// expect  a list of pids
 	pids := strings.Split(pidlist, ",")
-  
+
 	// open the zip file stream- write straight the httpResponseWriter
 
 	zipWriter := zip.NewWriter(w)
 	defer zipWriter.Close()
-
 
 	w.Header().Set("Content-Disposition", `inline; filename="`+pid+`.zip"`)
 	w.Header().Set("Content-Type", "application/zip")
@@ -289,6 +288,7 @@ func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http
 			http.Error(w, "500 Internal Error", http.StatusInternalServerError)
 			return
 		}
+	}
 }
 
 // returns the contents of the given URL
