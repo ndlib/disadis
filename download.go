@@ -226,14 +226,13 @@ func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http
 
 	// expect  a list of pids
 	pids := strings.Split(pidlist, ",")
-
+  
 	// open the zip file stream- write straight the httpResponseWriter
 
 	zipWriter := zip.NewWriter(w)
 	defer zipWriter.Close()
 
 
-	// Set the content tobe a zip file before we write anything
 	w.Header().Set("Content-Disposition", `inline; filename="`+pid+`.zip"`)
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Transfer-Encoding", "binary")
@@ -290,7 +289,6 @@ func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http
 			http.Error(w, "500 Internal Error", http.StatusInternalServerError)
 			return
 		}
-	}
 }
 
 // returns the contents of the given URL
