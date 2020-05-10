@@ -6,24 +6,24 @@ GO15VENDOREXPERIMENT=1
 
 .PHONY: all test clean rpm
 
-all: disadis 
+all: disadis
 
 disadis: $(wildcard *.go)
 	go build .
 
 test:
-	$(GOCMD)  test -v $(PACKAGES)
+	$(GOCMD) test -v $(PACKAGES)
 
 clean:
-	        rm -f disadis 
+	rm -f disadis
 
 rpm: disadis
-	               fpm -t rpm -s dir \
-	               --name disadis \
-	                --version $(VERSION) \
-	                --vendor ndlib \
-	                --maintainer DLT \
-	                --description "disadis daemon" \
-	                --rpm-user app \
-	                --rpm-group app \
-			disadis=/opt/disadis/bin/disadis
+	fpm -t rpm -s dir \
+		--name disadis \
+		--version $(VERSION) \
+		--vendor ndlib \
+		--maintainer DLT \
+		--description "disadis daemon" \
+		--rpm-user app \
+		--rpm-group app \
+		disadis=/opt/disadis/bin/disadis
