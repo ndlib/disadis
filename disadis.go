@@ -14,7 +14,6 @@ import (
 
 	gcfg "gopkg.in/gcfg.v1"
 
-	"github.com/ndlib/disadis/auth"
 	"github.com/ndlib/disadis/fedora"
 )
 
@@ -85,15 +84,10 @@ type config struct {
 	General struct {
 		Log_filename string
 		Fedora_addr  string
-		Admin        []string
 		Bendo_token  string
-	}
-	Pubtkt struct {
-		Key_file string
 	}
 	Handler map[string]*struct {
 		Port          string
-		Auth          bool
 		Prefix        string
 		Datastream    string
 		Datastream_id []string
@@ -108,7 +102,6 @@ func main() {
 	var (
 		logfilename string
 		logw        reopener
-		pubtktKey   string
 		fedoraAddr  string
 		configFile  string
 		config      config
@@ -116,8 +109,6 @@ func main() {
 	)
 
 	flag.StringVar(&logfilename, "log", "", "name of log file. Defaults to stdout")
-	flag.StringVar(&pubtktKey, "pubtkt-key", "",
-		"filename of PEM encoded public key to use for pubtkt authentication")
 	flag.StringVar(&fedoraAddr, "fedora", "",
 		"url to use for fedora, includes username and password, if needed")
 	flag.StringVar(&configFile, "config", "",
@@ -141,7 +132,6 @@ func main() {
 		}
 		logfilename = config.General.Log_filename
 		fedoraAddr = config.General.Fedora_addr
-		pubtktKey = config.Pubtkt.Key_file
 	}
 
 	/* first set up the log file */
@@ -161,16 +151,6 @@ func main() {
 		os.Exit(1)
 	}
 	fedora := fedora.NewRemote(fedoraAddr, "")
-	ha := auth.NewHydraAuth(fedoraAddr, "")
-	ha.Admin = config.General.Admin
-	log.Println("Admin users:", ha.Admin)
-	switch {
-	case pubtktKey != "":
-		log.Printf("Using pubtkt %s", pubtktKey)
-		ha.CurrentUser = auth.NewPubtktAuthFromKeyFile(pubtktKey)
-	default:
-		log.Printf("Warning: No authorization method given.")
-	}
 	if config.General.Bendo_token != "" {
 		log.Println("Bendo token supplied")
 	}
@@ -183,7 +163,7 @@ func main() {
 		writePID(pidfilename)
 	}
 
-	runHandlers(config, fedora, ha)
+	runHandlers(config, fedora)
 
 	if pidfilename != "" {
 		os.Remove(pidfilename)
@@ -192,7 +172,7 @@ func main() {
 
 // runHandlers starts a listener for each port in its own goroutine
 // and then waits for all of them to quit.
-func runHandlers(config config, fedora fedora.Fedora, auth *auth.HydraAuth) {
+func runHandlers(config config, fedora fedora.Fedora) {
 	var wg sync.WaitGroup
 	portHandlers := make(map[string]*DsidMux)
 	// first create the handlers
@@ -203,14 +183,10 @@ func runHandlers(config config, fedora fedora.Fedora, auth *auth.HydraAuth) {
 			Prefix:     v.Prefix,
 			BendoToken: config.General.Bendo_token,
 		}
-		if v.Auth {
-			h.Auth = auth
-		}
-		log.Printf("Handler %s (datastream %s, port %s, auth %v, dsid %v)",
+		log.Printf("Handler %s (datastream %s, port %s, dsid %v)",
 			k,
 			v.Datastream,
 			v.Port,
-			v.Auth,
 			v.Datastream_id)
 		mux, ok := portHandlers[v.Port]
 		if !ok {

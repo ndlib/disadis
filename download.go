@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ndlib/disadis/auth"
 	"github.com/ndlib/disadis/fedora"
 )
 
@@ -23,17 +22,6 @@ import (
 //
 // The first routes will return the contents of the
 // datastream named Ds.
-//
-// If Auth is not nil, the object with the given identifier is passed
-// to Auth, which may either return an error, a redirect, or nothing.
-// If nothing is returned, the contents are passed back.
-// The Auth handling is done after the identifier is decoded
-//
-// The reason the Handler calls Auth directly, instead of presuming
-// the auth handler has wrapped this one, is because this handler knows
-// how to parse the id out of the url, and it seems easier to just pass
-// the id to the auth handler than to have the auth handler do the same
-// thing.
 //
 // A pid namespace prefix can be assigned. It will be prepended to
 // any decoded identifiers. Nothing is put between the prefix and the
@@ -49,18 +37,16 @@ import (
 //	dh = NewDownloadHandler(NewRemoteFedora(fedora, ""))
 //	dh.Ds = "content"
 //	dh.Prefix = "vecnet:"
-//	dh.Auth = NewHydraAuth(fedora, "")
 //	http.Handle("/d/", http.StripPrefix("/d/", dh))
 //	return http.ListenAndServe(":"+port, nil)
 type DownloadHandler struct {
-	Fedora     fedora.Fedora   // connection to fedora
-	Ds         string          // the datastream to proxy
-	Prefix     string          // the PID prefix to use, needs colon
-	Auth       *auth.HydraAuth // kept for vecnet
-	BendoToken string          // optional, used for 'E' and 'R' datastreams
+	Fedora     fedora.Fedora // connection to fedora
+	Ds         string        // the datastream to proxy
+	Prefix     string        // the PID prefix to use, needs colon
+	BendoToken string        // optional, used for 'E' and 'R' datastreams
 }
 
-// The generic HTTP handler - parses the routes, does authorization,
+// The generic HTTP handler - parses the routes
 // and calls the route-specific sub-handlers
 
 func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -82,26 +68,6 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pid := dh.Prefix + components[0] // sanitize pid somehow?
-
-	// auth?
-	if dh.Auth != nil {
-		switch dh.Auth.Check(r, pid) {
-		case auth.AuthDeny:
-			// TODO: add WWW-Authenticate header field
-			http.Error(w, "401 Unauthorized", http.StatusUnauthorized)
-			return
-		case auth.AuthNotFound:
-			http.NotFound(w, r)
-			return
-		case auth.AuthAllow:
-			break
-		case auth.AuthError:
-			fallthrough
-		default:
-			http.Error(w, "500 Server Error", http.StatusInternalServerError)
-			return
-		}
-	}
 
 	//Valid routes are /:id (single file download)
 	//and /:id/zip/:id1,:id2,...idn (zip of all files associated with :id
@@ -158,7 +124,7 @@ func downloadSingleFile(dh *DownloadHandler, pid string, w http.ResponseWriter, 
 			http.NotFound(w, r)
 			return
 		default:
-			log.Println("Received fedora error:", err)
+			log.Println("Received error:", err)
 			http.Error(w, "500 Internal Error", http.StatusInternalServerError)
 			return
 		}

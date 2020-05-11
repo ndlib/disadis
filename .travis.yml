@@ -1,8 +1,9 @@
 language: go
 
 go:
- - 1.7.6
- - 1.8.5
- - 1.9.2
+ - 1.9.4
+ - 1.12.9
+ - 1.13.10
+ - 1.14.2
 install: true
-script: go test -v . ./auth ./fedora ./timecache
+script: go test -v . ./fedora
