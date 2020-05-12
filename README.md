@@ -10,14 +10,10 @@ Disadis is an download proxy for Hydra-based applications.
 It will proxy content out of a Fedora 3 instance, so your Ruby application
 doesn't have to devote a valuable app instance to doing an otherwise mindless
 task.
-Our preferred setup is to have the rails application handle the download request
+The way we do this is have the rails application handle the download request
 initially, and then, if the user is authorized, redirect to disadis by way of an
 nginx internal redirect.
 Then disadis will start and monitor the actual download to the client.
-While the original design of disadis had it verifying Hydra authorization with
-the `rightsMetadata` datastream, the authorization semantics have gotten
-complicated enough that we no longer recommend using this feature.
-(We bring it up only for those reading the code.)
 
 Features of Disadis include
 
@@ -111,7 +107,7 @@ of the fedora object `sufia:{id}`.
 Requests to the path `/{id}?datastream_id=thumb` result in the download of
 the `thumbnail` datastream.
 
-## Versioned 
+## Versioned
 
 If a datastream handler is has `versioned` set to `true`, then
 paths of the form `/{id}/{version}` are handled, where `version` refers
