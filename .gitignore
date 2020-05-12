@@ -1,2 +1,5 @@
 disadis
-*.swp
+*.sw?
+*.ini
+settings.local
+.DS_Store
