@@ -88,6 +88,10 @@ func (rf *remoteFedora) GetDatastream(id, dsname string) (io.ReadCloser, Content
 	info.Type = r.Header.Get("Content-Type")
 	info.Length = r.Header.Get("Content-Length")
 	info.Disposition = r.Header.Get("Content-Disposition")
+	// Try to read the the checksums in case this is an R datastream and we
+	// were redirected to bendo
+	info.MD5 = r.Header.Get("X-Content-Md5")
+	info.SHA256 = r.Header.Get("X-Content-Sha256")
 	return r.Body, info, nil
 }
 
