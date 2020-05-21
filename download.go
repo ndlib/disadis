@@ -74,18 +74,17 @@ func (dh *DownloadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//return MethodNotAllowed for others
 	switch {
 	case len(components) == 1:
-		downloadSingleFile(dh, pid, w, r)
+		dh.downloadSingleFile(pid, w, r)
 	case len(components) == 3 && components[1] == "zip":
-		downloadZip(dh, pid, w, r, components[2])
+		dh.downloadZip(pid, w, r, components[2])
 	default:
-		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+		http.NotFound(w, r)
 	}
-
 }
 
 // private method that downloads content for given pid.
 // works with both inline content in fedora, or indirect content from bendo
-func downloadSingleFile(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http.Request) {
+func (dh *DownloadHandler) downloadSingleFile(pid string, w http.ResponseWriter, r *http.Request) {
 	// always hit fedora for most recent info
 	// Should this lookup be cached?
 	dsinfo, err := dh.Fedora.GetDatastreamInfo(pid, dh.Ds)
@@ -177,12 +176,14 @@ func downloadSingleFile(dh *DownloadHandler, pid string, w http.ResponseWriter, 
 	http.ServeContent(w, r, dsinfo.Label, time.Time{}, NewStreamSeeker(content, n))
 }
 
+// downloadZip streams a zip file that contains the contents of the files
+// identified in the pidlist.
+//
 // assuming route /:pid1/zip/:pid2,:pid3..n
 // return zip file named pid1.zip containing files for pid1 , pid2, ...pid3
 // Now that we are actually streaming the zipfile back to the http responsewriter
 // as it is being written, to avoid having to buffer a large file on the local disadis machine
-
-func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http.Request, pidlist string) {
+func (dh *DownloadHandler) downloadZip(pid string, w http.ResponseWriter, r *http.Request, pidlist string) {
 
 	// For the time being, nosupport of HEAD requests
 	if r.Method == "HEAD" {
@@ -210,9 +211,8 @@ func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http
 		// Get Fedora Info
 		dsinfo, err := dh.Fedora.GetDatastreamInfo(dh.Prefix+this_pid, dh.Ds)
 		if err != nil {
-			log.Printf("Received Fedora error (%s,%s): %s", pid, dh.Ds, err.Error())
-			http.NotFound(w, r)
-			return
+			log.Printf("Received Fedora error (%s,%s): %s", this_pid, dh.Ds, err.Error())
+			continue
 		}
 
 		// return content
@@ -223,38 +223,42 @@ func downloadZip(dh *DownloadHandler, pid string, w http.ResponseWriter, r *http
 			// Get the content directly. This way we can supply the auth headers
 			// directly to the content supplier.
 			content, _, err = getBendoContent(dsinfo.Location, dh.BendoToken)
-			defer content.Close()
 		} else {
 			// get the content from fedora
 			content, _, err = dh.Fedora.GetDatastream(dh.Prefix+this_pid, dh.Ds)
-			defer content.Close()
 		}
 		if err != nil {
 			switch err {
 			case fedora.ErrNotFound:
-				http.NotFound(w, r)
-				return
+				log.Printf("Content not found (zip:%s/%s)", pid, this_pid)
+				continue
 			default:
-				log.Println("Received fedora error:", err)
-				http.Error(w, "500 Internal Error", http.StatusInternalServerError)
-				return
+				log.Printf("Received fedora error (zip:%s/%s): %s", pid, this_pid, err)
+				continue
 			}
 		}
 
-		zip_filep, err := zipWriter.Create(dsinfo.Label)
+		header := zip.FileHeader{
+			Name:     dsinfo.Label,
+			Method:   zip.Deflate,
+			Modified: time.Now(), // can we get a modified time for the file somehow?
+			Comment:  "CurateND:" + this_pid,
+		}
+		zip_filep, err := zipWriter.CreateHeader(&header)
 		if err != nil {
-			log.Println("Received fedora error:", err)
-			http.Error(w, "500 Internal Error", http.StatusInternalServerError)
-			return
+			log.Printf("zip:%s/%s: %s", pid, this_pid, err)
+			content.Close()
+			continue
 		}
 		// Stream the file conetent from the content ReadCloser to the ZipFile Writer
-		_, err2 := io.Copy(zip_filep, content)
-		if err2 != nil {
-			log.Println("Received zipFile io.Copy error:", err2)
-			http.Error(w, "500 Internal Error", http.StatusInternalServerError)
-			return
+		_, err = io.Copy(zip_filep, content)
+		content.Close()
+		if err != nil {
+			log.Printf("io.Copy: zip:%s/%s: %s", pid, this_pid, err)
+			return // a copy error is most likely a broken pipe.
 		}
 	}
+	zipWriter.SetComment("Downloaded from CurateND: " + pid)
 }
 
 // returns the contents of the given URL
