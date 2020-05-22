@@ -1,9 +1,8 @@
 language: go
 
 go:
- - 1.9.4
- - 1.12.9
- - 1.13.10
- - 1.14.2
+ - 1.13.3   # buildimage version
+ - 1.13.11
+ - 1.14.3
 install: true
 script: go test -v . ./fedora
