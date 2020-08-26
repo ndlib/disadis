@@ -115,4 +115,25 @@ Resources:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL
         Image: ndlib/bendo-buildimage
+
+  ProjectRHEL7:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub ${AWS::StackName}-RPMBuilder-RHEL7
+      Description: 'disadis from GitHub to S3 rpm for rhel7'
+      ServiceRole: !If [NoCodeBuildRole, !ImportValue 'codebuild:role', !Ref CodeBuildRole]
+      TimeoutInMinutes: 5
+      Source: {Type: GITHUB, Location: 'https://github.com/ndlib/disadis.git'}
+      Artifacts:
+        Type: S3
+        Packaging: NONE
+        NamespaceType: NONE
+        Path: disadis-rhel7
+        Name: rpms
+        Location: !If [NoBucket, !Ref Bucket, !Ref TargetBucket]
+        EncryptionDisabled: true
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: ndlib/bendo-buildimage-7
 ...
