@@ -157,12 +157,26 @@ func (dh *DownloadHandler) downloadSingleFile(pid string, w http.ResponseWriter,
 
 	// Use the size returned from the content request in case we redirected
 	n, _ := strconv.ParseInt(info.Length, 10, 64)
-	if n <= 0 {
+	// Don't support or use range requests if we either
+	//  1) Don't know the content length, or
+	//  2) Are downloading an PDF.
+	//
+	// The latter condition is to work around a bug with the internal PDF
+	// viewer in Chrome that doesn't send cookies for range requests coupled
+	// with the desire of the viewer to download PDFs in sections using range
+	// requests. This causes auth failures for private or nd-only files. When
+	// the bug is fixed this workaround can be removed.
+	//
+	// See https://bugs.chromium.org/p/chromium/issues/detail?id=961617
+	if n <= 0 || dsinfo.MIMEType == "application/pdf" {
+		if n > 0 {
+			w.Header().Set("Content-Length", info.Length)
+		}
 		if r.Method == "HEAD" {
 			return
 		}
-		// We have no idea of the content length...
-		// so we don't support range requests
+		// Since we are not supporting range requests, the only thing to do is
+		// copy the file out.
 		_, err = io.Copy(w, content)
 		if err != nil {
 			log.Println(err)

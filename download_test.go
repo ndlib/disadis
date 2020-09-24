@@ -67,6 +67,39 @@ func TestDLTP568(t *testing.T) {
 	}
 }
 
+// See if we don't advertise range requests for files with application/pdf
+// mime type.
+func TestCURATE173(t *testing.T) {
+	ts := setupHandler()
+	defer ts.Close()
+
+	table := []struct {
+		verb, route string
+		haveRange   bool
+	}{
+		{"GET", "/abc", true},
+		{"HEAD", "/abc", true},
+		{"GET", "/pdffile", false},
+		{"HEAD", "/pdffile", false},
+		{"GET", "/badsize", false},  // <= 0 length files also don't support ranges
+		{"HEAD", "/badsize", false}, // <= 0 length files also don't support ranges
+		{"GET", "/redirect", true},
+		{"HEAD", "/redirect", true},
+	}
+	for _, s := range table {
+		r, _ := checkRouteX(t, s.verb, ts.URL+s.route, 200, "", nil)
+		acceptRanges := r.Header.Get("Accept-Ranges")
+		ok := (s.haveRange && acceptRanges == "bytes") ||
+			(!s.haveRange && acceptRanges == "")
+		if !ok {
+			t.Errorf("%s %s: Expected Range %v, Received Accept-Ranges: %s",
+				s.verb,
+				s.route,
+				s.haveRange, acceptRanges)
+		}
+	}
+}
+
 // Check that redirects use the token, if supplied
 func TestRedirectToken(t *testing.T) {
 	ts := setupHandler()
@@ -99,6 +132,7 @@ func checkRoute(t *testing.T, verb, route string, status int, expected string) {
 	checkRouteX(t, verb, route, status, expected, nil)
 }
 
+// checkRouteX is like checkRoute, but returns a response structure
 func checkRouteX(t *testing.T, verb, route string, status int, expected string, setup func(*http.Request)) (*http.Response, []byte) {
 	req, err := http.NewRequest(verb, route, nil)
 	if err != nil {
@@ -160,10 +194,12 @@ func (t *AuthTarget) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// token in list?
 	for _, token := range t.Tokens {
 		if goal == token {
+			w.Write([]byte("c"))
 			return
 		}
 	}
 	w.WriteHeader(http.StatusUnauthorized)
+	w.Write([]byte("c"))
 }
 
 var BendoServer *httptest.Server
@@ -197,6 +233,10 @@ func setupHandler() *httptest.Server {
 			MIMEType:     "image/png",
 		},
 		[]byte("from fedora"))
+	tf.Set("test:pdffile",
+		"content",
+		fedora.DsInfo{MIMEType: "application/pdf"},
+		[]byte("pdf contents here"))
 	h := &DownloadHandler{
 		Fedora:     tf,
 		Ds:         "content",
