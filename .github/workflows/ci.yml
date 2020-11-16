@@ -1,7 +1,7 @@
 name: bendo-ci
 on: [push]
 jobs:
-  test-submitted-code
+  name: test-submitted-code
     runs-on: ubuntu-latest
     steps:
 
