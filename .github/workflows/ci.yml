@@ -1,5 +1,5 @@
 name: bendo-ci
-on: push
+on: [push]
 jobs:
   job1:
     runs-on: ubuntu-latest
