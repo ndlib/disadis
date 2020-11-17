@@ -1,0 +1,4 @@
+gopkg.in/gcfg.v1 v1.2.1 h1:wJld/fq1ChPq0K12xrOWpH9E0708XZpQK05DUY0tZmk=
+gopkg.in/gcfg.v1 v1.2.1/go.mod h1:yesOnuUOFQAhST5vPY4nbZsb/huCgGGXlipJsBn0b3o=
+gopkg.in/warnings.v0 v0.1.2 h1:wFXVbFY8DY5/xOe1ECiWdKCzZlxgshcYVNkBHstARME=
+gopkg.in/warnings.v0 v0.1.2/go.mod h1:jksf8JmL6Qr/oQM2OXTHunEvvTAsrWBLb6OOjuVWRNI=
