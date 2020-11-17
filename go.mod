@@ -1,6 +1,6 @@
 module github.com/ndlib/disadis
 
-go 1.12
+go 1.15
 
 require (
 	gopkg.in/gcfg.v1 v1.2.1
