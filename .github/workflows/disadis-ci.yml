@@ -1,4 +1,4 @@
-name: bendo-ci
+name: disadis-ci
 on: [push]
 jobs:
   job1:
