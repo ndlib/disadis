@@ -106,7 +106,7 @@ func (dh *DownloadHandler) downloadSingleFile(pid string, w http.ResponseWriter,
 	}
 
 	// return content
-	var content io.ReadCloser
+	var content io.ReadSeeker
 	var info fedora.ContentInfo
 	if dh.BendoToken != "" && dsinfo.LocationType == "URL" {
 		// this datastream is stored outside of fedora
@@ -115,7 +115,12 @@ func (dh *DownloadHandler) downloadSingleFile(pid string, w http.ResponseWriter,
 		content, info, err = getBendoContent(dsinfo.Location, dh.BendoToken)
 	} else {
 		// get the content from fedora
-		content, info, err = dh.Fedora.GetDatastream(pid, dh.Ds)
+		// use StreamSeeker to handle range requests.
+		var data io.ReadCloser
+		data, info, err = dh.Fedora.GetDatastream(pid, dh.Ds)
+		n, _ := strconv.ParseInt(info.Length, 10, 64)
+		content = NewStreamSeeker(data, n)
+		defer data.Close()
 	}
 	if err != nil {
 		switch err {
@@ -128,7 +133,6 @@ func (dh *DownloadHandler) downloadSingleFile(pid string, w http.ResponseWriter,
 			return
 		}
 	}
-	defer content.Close()
 
 	// sometimes fedora appends an extra extension. See FCREPO-497 in the
 	// fedora commons JIRA. This is why we pull the filename directly from
@@ -184,10 +188,8 @@ func (dh *DownloadHandler) downloadSingleFile(pid string, w http.ResponseWriter,
 		return
 	}
 
-	// use ServeContent and the StreamSeeker to handle range requests.
-	// when/if fedora ever supports range requests, this should be changed to
-	// pass the range through
-	http.ServeContent(w, r, dsinfo.Label, time.Time{}, NewStreamSeeker(content, n))
+	// use ServeContent to handle range requests.
+	http.ServeContent(w, r, dsinfo.Label, time.Time{}, content)
 }
 
 // downloadZip streams a zip file that contains the contents of the files
@@ -277,9 +279,9 @@ func (dh *DownloadHandler) downloadZip(pid string, w http.ResponseWriter, r *htt
 
 // returns the contents of the given URL
 // The returned stream needs to be closed when finished.
-func getBendoContent(url, token string) (io.ReadCloser, fedora.ContentInfo, error) {
+func getBendoContent(url, token string) (io.ReadSeekCloser, fedora.ContentInfo, error) {
 	var info fedora.ContentInfo
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("HEAD", url, nil)
 	if err != nil {
 		return nil, info, err
 	}
@@ -288,8 +290,8 @@ func getBendoContent(url, token string) (io.ReadCloser, fedora.ContentInfo, erro
 	if err != nil {
 		return nil, info, err
 	}
+	r.Body.Close()
 	if r.StatusCode != 200 {
-		r.Body.Close()
 		switch r.StatusCode {
 		case 404:
 			return nil, info, fedora.ErrNotFound
@@ -304,5 +306,6 @@ func getBendoContent(url, token string) (io.ReadCloser, fedora.ContentInfo, erro
 	info.Disposition = r.Header.Get("Content-Disposition")
 	info.MD5 = r.Header.Get("X-Content-Md5")
 	info.SHA256 = r.Header.Get("X-Content-Sha256")
-	return r.Body, info, nil
+	length, _ := strconv.ParseInt(info.Length, 10, 64)
+	return NewHTTPSeeker(url, length, token), info, nil
 }
